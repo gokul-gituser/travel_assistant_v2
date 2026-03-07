@@ -995,7 +995,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
         })
 
         store.put(history_namespace, "history", history)
-        print(f"DEBUG location history saved: {history}")
+        #print(f"DEBUG location history saved: {history}")
 
     #save travel history  ---
     travel_namespace = ("travel_history", user_id)
