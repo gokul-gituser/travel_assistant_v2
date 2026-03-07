@@ -1101,6 +1101,9 @@ async def run_travel_assistant(
     location: Optional[dict] = None,
     thread_id: Optional[str] = None,
 ) -> str:
+
+    graph = _get_graph()
+    
     if thread_id is None:
         thread_id = f"travel-{user_id}"
     config = {
