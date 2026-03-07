@@ -391,6 +391,7 @@ class GraphState(TypedDict):
     
     # Context spine
     location: Optional[LocationContext]
+    nearby_context: Optional[str]
     time_context: Optional[TimeContext]
     party: Optional[PartyContext]
     preferences: Optional[PreferencesContext]
@@ -432,6 +433,8 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         captured_at=raw_location.get("captured_at"),
         city=raw_location.get("city")
     ) if raw_location else None
+    nearby_context = configurable.get("nearby_context")
+
 
     #  Time context from system clock
     time_context = build_time_context()
@@ -484,6 +487,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
 
     return {
         "location": location,
+        "nearby_context": nearby_context,
         "time_context": time_context,
         "party": party,
         "preferences": preferences,
@@ -741,6 +745,7 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
 
     # context for system prompt
     location = state.get("location")
+    nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
 
@@ -750,6 +755,7 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
     
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results")  + context_text
@@ -772,6 +778,7 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
 
     # context for system prompt
     location = state.get("location")
+    nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
 
@@ -781,6 +788,7 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
     
     system_prompt = SYSTEM_PROMPT_NEARBY_BY_NEED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
@@ -803,6 +811,7 @@ def handle_itinerary(state: GraphState, config: RunnableConfig, *, store: BaseSt
 
     # context for system prompt
     location = state.get("location")
+    nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
@@ -811,6 +820,7 @@ def handle_itinerary(state: GraphState, config: RunnableConfig, *, store: BaseSt
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
     
     system_prompt = SYSTEM_PROMPT_ITINERARY.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
@@ -833,6 +843,7 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
 
     # context for system prompt
     location = state.get("location")
+    nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
@@ -841,6 +852,7 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
     
     system_prompt = SYSTEM_PROMPT_FOOD.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
@@ -863,6 +875,7 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
 
     # context for system prompt
     location = state.get("location")
+    nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
@@ -871,6 +884,7 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
     
     system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
@@ -893,6 +907,7 @@ def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store:
 
     # context for system prompt
     location = state.get("location")
+    nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
@@ -901,6 +916,7 @@ def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store:
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
     
     system_prompt = SYSTEM_PROMPT_SAFETY.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
@@ -923,6 +939,7 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
 
     # context for system prompt
     location = state.get("location")
+    nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
@@ -931,6 +948,7 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
     
     system_prompt = SYSTEM_PROMPT_FALLBACK.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
@@ -1100,6 +1118,7 @@ async def run_travel_assistant(
     text: str,
     location: Optional[dict] = None,
     thread_id: Optional[str] = None,
+    nearby_context: Optional[str] = None,
 ) -> str:
 
     graph = _get_graph()
@@ -1111,6 +1130,7 @@ async def run_travel_assistant(
             "user_id": user_id,
             "thread_id": thread_id,
             "location": location,
+            "nearby_context": nearby_context,
             "connected_accounts": {"google": False, "facebook": False, "instagram": False},
         }
     }
