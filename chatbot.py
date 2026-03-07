@@ -1009,72 +1009,82 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     
     return state
 
+def _build_graph():
+    builder = StateGraph(GraphState)
 
-builder = StateGraph(GraphState)
-
-builder.add_node("context_builder", context_builder)
-builder.add_node("router", router_node)
-builder.add_node(Intent.INTENT_A_NEARBY_GENERIC.value, handle_nearby_generic)
-builder.add_node(Intent.INTENT_B_NEARBY_BY_NEED.value, handle_nearby_by_need)
-builder.add_node(Intent.INTENT_C_ITINERARY.value, handle_itinerary)
-builder.add_node(Intent.INTENT_D_FOOD_DIETARY.value, handle_food_dietary)
-builder.add_node(Intent.INTENT_E_FRIENDS_BASED.value, handle_friends_based)
-builder.add_node(Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value, handle_safety_practical)
-builder.add_node("clarification", handle_clarification)
-builder.add_node("General Chat/ Fallback", handle_fallback)
-builder.add_node("Health Emergency", handle_urgent)
-builder.add_node("write_memory", write_memory)
-
-
-builder.add_edge(START, "context_builder")
-builder.add_edge("context_builder", "router")
-
-builder.add_conditional_edges(
-    "router",
-    router_decision,
-    {
-        Intent.INTENT_A_NEARBY_GENERIC.value: Intent.INTENT_A_NEARBY_GENERIC.value,
-        Intent.INTENT_B_NEARBY_BY_NEED.value: Intent.INTENT_B_NEARBY_BY_NEED.value,
-        Intent.INTENT_C_ITINERARY.value: Intent.INTENT_C_ITINERARY.value,
-        Intent.INTENT_D_FOOD_DIETARY.value: Intent.INTENT_D_FOOD_DIETARY.value,
-        Intent.INTENT_E_FRIENDS_BASED.value: Intent.INTENT_E_FRIENDS_BASED.value,
-        Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value: Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
-        "clarification": "clarification",
-        "General Chat/ Fallback": "General Chat/ Fallback",
-        "Health Emergency": "Health Emergency",
-    },
-)
-builder.add_edge("clarification", END)
-
-for node in [
-    Intent.INTENT_A_NEARBY_GENERIC.value,
-    Intent.INTENT_B_NEARBY_BY_NEED.value,
-    Intent.INTENT_C_ITINERARY.value,
-    Intent.INTENT_D_FOOD_DIETARY.value,
-    Intent.INTENT_E_FRIENDS_BASED.value,
-    Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
-    "General Chat/ Fallback",
-    "Health Emergency",
-]:
-    builder.add_edge(node, "write_memory")
-
-builder.add_edge("write_memory", END)
+    builder.add_node("context_builder", context_builder)
+    builder.add_node("router", router_node)
+    builder.add_node(Intent.INTENT_A_NEARBY_GENERIC.value, handle_nearby_generic)
+    builder.add_node(Intent.INTENT_B_NEARBY_BY_NEED.value, handle_nearby_by_need)
+    builder.add_node(Intent.INTENT_C_ITINERARY.value, handle_itinerary)
+    builder.add_node(Intent.INTENT_D_FOOD_DIETARY.value, handle_food_dietary)
+    builder.add_node(Intent.INTENT_E_FRIENDS_BASED.value, handle_friends_based)
+    builder.add_node(Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value, handle_safety_practical)
+    builder.add_node("clarification", handle_clarification)
+    builder.add_node("General Chat/ Fallback", handle_fallback)
+    builder.add_node("Health Emergency", handle_urgent)
+    builder.add_node("write_memory", write_memory)
 
 
+    builder.add_edge(START, "context_builder")
+    builder.add_edge("context_builder", "router")
 
-REDIS_URI = os.getenv("REDIS_URL")
+    builder.add_conditional_edges(
+        "router",
+        router_decision,
+        {
+            Intent.INTENT_A_NEARBY_GENERIC.value: Intent.INTENT_A_NEARBY_GENERIC.value,
+            Intent.INTENT_B_NEARBY_BY_NEED.value: Intent.INTENT_B_NEARBY_BY_NEED.value,
+            Intent.INTENT_C_ITINERARY.value: Intent.INTENT_C_ITINERARY.value,
+            Intent.INTENT_D_FOOD_DIETARY.value: Intent.INTENT_D_FOOD_DIETARY.value,
+            Intent.INTENT_E_FRIENDS_BASED.value: Intent.INTENT_E_FRIENDS_BASED.value,
+            Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value: Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
+            "clarification": "clarification",
+            "General Chat/ Fallback": "General Chat/ Fallback",
+            "Health Emergency": "Health Emergency",
+        },
+    )
+    builder.add_edge("clarification", END)
 
-with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
-    checkpointer.setup()
-    with RedisStore.from_conn_string(REDIS_URI) as store:
-        store.setup()
-        graph = builder.compile(checkpointer=checkpointer, store=store)
+    for node in [
+        Intent.INTENT_A_NEARBY_GENERIC.value,
+        Intent.INTENT_B_NEARBY_BY_NEED.value,
+        Intent.INTENT_C_ITINERARY.value,
+        Intent.INTENT_D_FOOD_DIETARY.value,
+        Intent.INTENT_E_FRIENDS_BASED.value,
+        Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
+        "General Chat/ Fallback",
+        "Health Emergency",
+    ]:
+        builder.add_edge(node, "write_memory")
 
+    builder.add_edge("write_memory", END)
+
+
+
+    REDIS_URI = os.getenv("REDIS_URL")
+
+    with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
+        checkpointer.setup()
+        with RedisStore.from_conn_string(REDIS_URI) as store:
+            store.setup()
+            graph = builder.compile(checkpointer=checkpointer, store=store)
+
+    return graph
             # mermaid = graph.get_graph().draw_mermaid()
             # with open("chatbot_graph_4.mmd", "w", encoding="utf-8") as f:
             #     f.write(mermaid)
             # print("Wrote: chatbot_graph_4.mmd")
 
+_graph = None
+
+
+def _get_graph():
+    """Get or initialize the compiled graph (singleton pattern)"""
+    global _graph
+    if _graph is None:
+        _graph = _build_graph()
+    return _graph
 
 DUMMY_LOCATION = {
         "lat": 51.5074,
@@ -1132,7 +1142,7 @@ if __name__ == "__main__":
             }
         }
     }
-
+    graph = _get_graph()
     while True:
         user_input = input("You: ").strip()
                 
