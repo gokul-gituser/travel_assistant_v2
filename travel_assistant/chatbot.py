@@ -747,10 +747,10 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     last_results = state.get("last_results") 
     
     context_text = f"""
-        Current Location: {location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})
-        Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-        User Preferences: vibe={preferences.get('vibe')}, cuisine={preferences.get('cuisine')}, budget={preferences.get('budget')}
-    """
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+"""
     
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results")  + context_text
     
@@ -778,10 +778,10 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
     last_results = state.get("last_results") 
     
     context_text = f"""
-        Current Location: {location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})
-        Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-        User Preferences: vibe={preferences.get('vibe')}, cuisine={preferences.get('cuisine')}, budget={preferences.get('budget')}
-    """
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+"""
     
     system_prompt = SYSTEM_PROMPT_NEARBY_BY_NEED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
     
@@ -808,10 +808,10 @@ def handle_itinerary(state: GraphState, config: RunnableConfig, *, store: BaseSt
     last_results = state.get("last_results") 
     
     context_text = f"""
-        Current Location: {location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})
-        Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-        User Preferences: vibe={preferences.get('vibe')}, cuisine={preferences.get('cuisine')}, budget={preferences.get('budget')}
-    """
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+"""
     
     system_prompt = SYSTEM_PROMPT_ITINERARY.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
     
@@ -838,10 +838,10 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
     last_results = state.get("last_results") 
     
     context_text = f"""
-        Current Location: {location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})
-        Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-        User Preferences: vibe={preferences.get('vibe')}, cuisine={preferences.get('cuisine')}, budget={preferences.get('budget')}
-    """
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+"""
     
     system_prompt = SYSTEM_PROMPT_FOOD.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
     
@@ -868,10 +868,10 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
     last_results = state.get("last_results") 
     
     context_text = f"""
-        Current Location: {location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})
-        Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-        User Preferences: vibe={preferences.get('vibe')}, cuisine={preferences.get('cuisine')}, budget={preferences.get('budget')}
-    """
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+"""
     
     system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
     
@@ -898,10 +898,10 @@ def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store:
     last_results = state.get("last_results") 
     
     context_text = f"""
-        Current Location: {location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})
-        Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-        User Preferences: vibe={preferences.get('vibe')}, cuisine={preferences.get('cuisine')}, budget={preferences.get('budget')}
-    """
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+"""
     
     system_prompt = SYSTEM_PROMPT_SAFETY.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
     
@@ -928,10 +928,10 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
     last_results = state.get("last_results") 
     
     context_text = f"""
-        Current Location: {location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})
-        Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-        User Preferences: vibe={preferences.get('vibe')}, cuisine={preferences.get('cuisine')}, budget={preferences.get('budget')}
-    """
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+"""
     
     system_prompt = SYSTEM_PROMPT_FALLBACK.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
     
@@ -1103,7 +1103,7 @@ async def run_travel_assistant(
 ) -> str:
 
     graph = _get_graph()
-    
+
     if thread_id is None:
         thread_id = f"travel-{user_id}"
     config = {
