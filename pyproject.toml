@@ -1,0 +1,21 @@
+[project]
+name = "travel-assistant"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.131.0",
+    "langchain>=1.2.8",
+    "langchain-openai>=1.1.7",
+    "langgraph>=1.0.7",
+    "langgraph-checkpoint-redis>=0.3.4",
+    "langsmith>=0.6.8",
+    "logging>=0.4.9.6",
+    "openai>=2.16.0",
+    "pydantic>=2.12.5",
+    "python-dotenv>=1.2.1",
+    "redis>=7.1.0",
+    "trustcall>=0.0.39",
+    "uvicorn>=0.41.0",
+]
