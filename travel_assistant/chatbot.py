@@ -766,6 +766,9 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
         SystemMessage(content=system_prompt),
         *state["messages"]
     ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)],
             "last_results": [{"handler": Intent.INTENT_A_NEARBY_GENERIC.value, "response": response.content}]} 
@@ -799,6 +802,9 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
         SystemMessage(content=system_prompt),
         *state["messages"]
     ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)],
              "last_results": [{"handler": Intent.INTENT_B_NEARBY_BY_NEED.value, "response": response.content}]} 
@@ -831,6 +837,9 @@ def handle_itinerary(state: GraphState, config: RunnableConfig, *, store: BaseSt
         SystemMessage(content=system_prompt),
         *state["messages"]
     ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)],
              "last_results": [{"handler": Intent.INTENT_C_ITINERARY.value, "response": response.content}]} 
@@ -863,6 +872,9 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
         SystemMessage(content=system_prompt),
         *state["messages"]
     ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)],
              "last_results": [{"handler": Intent.INTENT_D_FOOD_DIETARY.value, "response": response.content}]} 
@@ -895,6 +907,9 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
         SystemMessage(content=system_prompt),
         *state["messages"]
     ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)],
              "last_results": [{"handler": Intent.INTENT_E_FRIENDS_BASED.value, "response": response.content}]} 
@@ -927,6 +942,9 @@ def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store:
         SystemMessage(content=system_prompt),
         *state["messages"]
     ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)],
              "last_results": [{"handler": Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value, "response": response.content}]} 
@@ -959,6 +977,9 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
         SystemMessage(content=system_prompt),
         *state["messages"]
     ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)]} 
 
