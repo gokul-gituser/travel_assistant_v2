@@ -748,6 +748,8 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
+    print("DEBUG: NEARBY CONTEXT SENT TO LLM:")
+    print(nearby)
 
     last_results = state.get("last_results") 
     
