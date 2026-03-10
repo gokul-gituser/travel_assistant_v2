@@ -899,7 +899,7 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
     system_prompt = SYSTEM_PROMPT_NEARBY_BY_NEED.format(
         user_profile=user_profile_text,
         nearby_places=nearby if nearby else "NOT AVAILABLE",
-         location_context=location_context
+        location_context=location_context,
         last_results=last_results or "No previous results")
     
     response = llm.invoke([
