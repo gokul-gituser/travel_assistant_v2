@@ -97,8 +97,10 @@ USER PROFILE
 
 --------------------------------
 
-TRAVEL HISTORY
-{travel_history}
+
+Location: {location_context}
+NEARBY PLACES:
+{nearby_places}
 
 --------------------------------
 
@@ -139,8 +141,9 @@ use the previous results provided to refine your response accordingly.
 Previous Results:
 {last_results}
 
-Travel History:
-{travel_history}"""
+Location: {location_context}
+NEARBY PLACES:
+{nearby_places}"""
 
 SYSTEM_PROMPT_FOOD = """You are a food and dining expert travel assistant.
 You specialize in finding restaurants with dietary considerations.
@@ -159,8 +162,9 @@ Previous Results:
 {last_results}
 
 
-Travel History:
-{travel_history}"""
+Location: {location_context}
+NEARBY PLACES:
+{nearby_places}"""
 
 SYSTEM_PROMPT_ITINERARY = """You are a travel planning expert.
 You create detailed, personalized day plans and itineraries.
@@ -275,8 +279,9 @@ use the previous results provided to refine your response accordingly.
 Previous Results:
 {last_results}
 
-Travel History:
-{travel_history}"""
+Location: {location_context}
+NEARBY PLACES
+{nearby_places}"""
 
 INTENT_CLASSIFIER_PROMPT = """
 You are an expert intent detection engine for a travel assistant chatbot.
@@ -834,15 +839,23 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     print(nearby)
 
     last_results = state.get("last_results") 
+
+    location_context = (
+        f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
+        if location else "NOT AVAILABLE"
+    )
     
-    context_text = f"""
-    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
-    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
-    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
-"""
+#     context_text = f"""
+#     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+#     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+#     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+#     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
+# """
     
-    system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results")  + context_text
+    system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
+    location_context=location_context
+    ,last_results=last_results or "No previous results"
+    ,nearby_places=nearby if nearby else "NOT AVAILABLE")
     
     response = llm.invoke([
         SystemMessage(content=system_prompt),
@@ -869,16 +882,25 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
     time_context = state.get("time_context")
     preferences = state.get("preferences")
 
+    location_context = (
+        f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
+        if location else "NOT AVAILABLE"
+    )
+
     last_results = state.get("last_results") 
     
-    context_text = f"""
-    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
-    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
-    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
-"""
+#     context_text = f"""
+#     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+#     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+#     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+#     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
+# """
     
-    system_prompt = SYSTEM_PROMPT_NEARBY_BY_NEED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
+    system_prompt = SYSTEM_PROMPT_NEARBY_BY_NEED.format(
+        user_profile=user_profile_text,
+        nearby_places=nearby if nearby else "NOT AVAILABLE",
+         location_context=location_context
+        last_results=last_results or "No previous results")
     
     response = llm.invoke([
         SystemMessage(content=system_prompt),
