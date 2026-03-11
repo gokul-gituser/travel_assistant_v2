@@ -167,7 +167,7 @@ Previous Results:
 {{last_results}}
 
 LIVE LOCATION. Use this for place recommendations — ignore "Home" in user profile:
-Location: {location_context}
+Location: {{location_context}}
 
 NEARBY PLACES:
 {{nearby_places}}""".format(places_list_rules=_PLACES_LIST_RULES)
