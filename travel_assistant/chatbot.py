@@ -36,7 +36,7 @@ class UserProfile(BaseModel):
     """Complete profile of a user"""
     user_name: str = Field(description="The user's preferred name")
     age: Optional[str] = Field(default=None, description="User's age")
-    location: Optional[str] = Field(default=None, description="User's city/country")
+    location: Optional[str] = Field(default=None, description="The user's home city or country. The place where user lives")
     interests: list = Field(default_factory=list, description="User's interests")
     dislikes: list = Field(default_factory=list, description="Things user dislikes")
     additional_notes: Optional[str] = Field(default=None, description="Other personal details")
@@ -97,7 +97,7 @@ USER PROFILE
 
 --------------------------------
 
-
+LIVE LOCATION. Use this for place recommendations — ignore "Home" in user profile:
 Location: {location_context}
 NEARBY PLACES:
 {nearby_places}
@@ -141,6 +141,7 @@ use the previous results provided to refine your response accordingly.
 Previous Results:
 {last_results}
 
+LIVE LOCATION. Use this for place recommendations — ignore "Home" in user profile:
 Location: {location_context}
 NEARBY PLACES:
 {nearby_places}"""
@@ -161,8 +162,9 @@ use the previous results provided to refine your response accordingly.
 Previous Results:
 {last_results}
 
-
+LIVE LOCATION. Use this for place recommendations — ignore "Home" in user profile:
 Location: {location_context}
+
 NEARBY PLACES:
 {nearby_places}"""
 
@@ -176,6 +178,9 @@ If the user says things that could include checking previous results like "show 
 use the previous results provided to refine your response accordingly.
 Previous Results:
 {last_results}
+
+User's Current Location:
+Location: {location_context}
 
 Travel History:
 {travel_history}"""
@@ -279,7 +284,9 @@ use the previous results provided to refine your response accordingly.
 Previous Results:
 {last_results}
 
+LIVE LOCATION. Use this for place recommendations — ignore "Home" in user profile:
 Location: {location_context}
+
 NEARBY PLACES
 {nearby_places}"""
 
@@ -670,7 +677,7 @@ def get_user_profile_text(store: BaseStore, user_id: str) -> str:
     profile = existing.value
     return f"""Name: {profile.get('user_name', 'Unknown')}
             Age: {profile.get('age', 'Not provided')}
-            Location: {profile.get('location', 'Not provided')}
+            Home: {profile.get('location', 'Not provided')}
             Interests: {', '.join(profile.get('interests', []))}
             Dislikes: {', '.join(profile.get('dislikes', []))}
             Notes: {profile.get('additional_notes', 'None')}"""
@@ -978,8 +985,8 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
     system_prompt = SYSTEM_PROMPT_FALLBACK.format(
             user_profile=user_profile_text,
             last_results=last_results or "No previous results",
-            location_context=location_context,           # ← was missing
-            nearby_places=nearby if nearby else "NOT AVAILABLE",  # ← was missing
+            location_context=location_context,           
+            nearby_places=nearby if nearby else "NOT AVAILABLE", 
         )    
     response = llm.invoke([
         SystemMessage(content=system_prompt),
