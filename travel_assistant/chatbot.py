@@ -963,15 +963,24 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
     
-    context_text = f"""
-    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
-    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
-    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
-"""
+    location_context = (
+        f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
+        if location else "NOT AVAILABLE"
+    )
     
-    system_prompt = SYSTEM_PROMPT_FOOD.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
+#     context_text = f"""
+#     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+#     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+#     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+#     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
+# """
     
+    system_prompt = SYSTEM_PROMPT_FALLBACK.format(
+            user_profile=user_profile_text,
+            last_results=last_results or "No previous results",
+            location_context=location_context,           # ← was missing
+            nearby_places=nearby if nearby else "NOT AVAILABLE",  # ← was missing
+        )    
     response = llm.invoke([
         SystemMessage(content=system_prompt),
         *state["messages"]
