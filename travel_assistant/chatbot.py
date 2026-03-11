@@ -982,7 +982,7 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
 #     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 # """
     
-    system_prompt = SYSTEM_PROMPT_FALLBACK.format(
+    system_prompt = SYSTEM_PROMPT_FOOD.format(
             user_profile=user_profile_text,
             last_results=last_results or "No previous results",
             location_context=location_context,           
