@@ -106,7 +106,8 @@ Location: {{location_context}}
 NEARBY PLACES:
 {{nearby_places}}
 
---------------------------------
+LOCATION HISTORY (user's previously visited locations, most recent last):
+{{location_history}}
 
 ADDITIONAL RULES
 
@@ -148,7 +149,10 @@ Previous Results:
 LIVE LOCATION. Use this for place recommendations — ignore "Home" in user profile:
 Location: {{location_context}}
 NEARBY PLACES:
-{{nearby_places}}""".format(places_list_rules=_PLACES_LIST_RULES)
+{{nearby_places}}
+
+LOCATION HISTORY (user's previously visited locations, most recent last):
+{{location_history}}""".format(places_list_rules=_PLACES_LIST_RULES)
 
 SYSTEM_PROMPT_FOOD = """You are a food and dining expert travel assistant.
 You specialize in finding restaurants with dietary considerations.
@@ -286,6 +290,9 @@ Previous Results:
 
 LIVE LOCATION. Use this for place recommendations — ignore "Home" in user profile:
 Location: {{location_context}}
+
+LOCATION HISTORY (user's previously visited locations, most recent last):
+{{location_history}}
 
 NEARBY PLACES
 {{nearby_places}}""".format(places_list_rules=_PLACES_LIST_RULES)
@@ -493,6 +500,7 @@ class GraphState(TypedDict):
     connected_accounts: Optional[Dict] 
     safety_mode: str  # "normal" | "urgent_health"
     last_results: Optional[List[Dict]]
+    location_history_text: Optional[str]
     
     # Intent routing
     classification: Optional[Dict]
@@ -579,6 +587,14 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     print(f"Constraints: {constraints}")
     print(f"---------------------\n")
 
+    history_namespace = ("location_history", user_id)
+    existing_history = store.get(history_namespace, "history")
+    location_history = existing_history.value if existing_history else []
+    location_history_text = "\n".join([
+        f"{h['date']} {h['time']} — {h['address']} ({h['lat']}, {h['lon']})"
+        for h in location_history[-5:]  # last 5 
+    ]) or "No location history yet"
+
     return {
         "location": location,
         "nearby_context": nearby_context,
@@ -589,6 +605,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         "connected_accounts": connected_accounts,
         "safety_mode": "normal",
         "last_results": last_results,
+        "location_history_text": location_history_text,
     }
 
 
@@ -851,6 +868,9 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
         f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
         if location else "NOT AVAILABLE"
     )
+
+    location_history_text = state.get("location_history_text", "No location history yet")
+
     
 #     context_text = f"""
 #     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
@@ -861,7 +881,8 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
     location_context=location_context
-    ,last_results=last_results or "No previous results"
+    ,last_results=last_results or "No previous results",
+    location_history=location_history_text
     ,nearby_places=nearby if nearby else "NOT AVAILABLE")
     
     response = llm.invoke([
@@ -894,6 +915,9 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
         if location else "NOT AVAILABLE"
     )
 
+    location_history_text = state.get("location_history_text", "No location history yet")
+
+
     last_results = state.get("last_results") 
     
 #     context_text = f"""
@@ -907,6 +931,7 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
         user_profile=user_profile_text,
         nearby_places=nearby if nearby else "NOT AVAILABLE",
         location_context=location_context,
+        location_history=location_history_text,
         last_results=last_results or "No previous results")
     
     response = llm.invoke([
@@ -1088,6 +1113,9 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
         f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
         if location else "NOT AVAILABLE"
     )
+
+    location_history_text = state.get("location_history_text", "No location history yet")
+
     
 #     context_text = f"""
 #     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
@@ -1099,8 +1127,9 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
     system_prompt = SYSTEM_PROMPT_FALLBACK.format(
             user_profile=user_profile_text,
             last_results=last_results or "No previous results",
-            location_context=location_context,           # ← was missing
-            nearby_places=nearby if nearby else "NOT AVAILABLE",  # ← was missing
+            location_context=location_context,           
+            location_history=location_history_text,
+            nearby_places=nearby if nearby else "NOT AVAILABLE",  
         )    
     response = llm.invoke([
         SystemMessage(content=system_prompt),
