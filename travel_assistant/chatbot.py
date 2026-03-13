@@ -705,6 +705,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     """Build context from config (location) and conversation (preferences/party/constraints)"""
     
     configurable = config.get("configurable", {})
+    user_id = configurable.get("user_id")
     user_msg = state["messages"][-1].content
 
     # . Location from config 
