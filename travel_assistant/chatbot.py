@@ -1520,6 +1520,10 @@ def _build_graph():
     builder.add_node("router", router_node)
     builder.add_node(Intent.INTENT_A_NEARBY_GENERIC.value, handle_nearby_generic)
     builder.add_node(Intent.INTENT_B_NEARBY_BY_NEED.value, handle_nearby_by_need)
+
+    builder.add_node("itinerary_collect", collect_itinerary_context)
+    builder.add_node("itinerary_enrich",  enrich_itinerary_data)
+
     builder.add_node(Intent.INTENT_C_ITINERARY.value, handle_itinerary)
     builder.add_node(Intent.INTENT_D_FOOD_DIETARY.value, handle_food_dietary)
     builder.add_node(Intent.INTENT_E_FRIENDS_BASED.value, handle_friends_based)
@@ -1539,7 +1543,7 @@ def _build_graph():
         {
             Intent.INTENT_A_NEARBY_GENERIC.value: Intent.INTENT_A_NEARBY_GENERIC.value,
             Intent.INTENT_B_NEARBY_BY_NEED.value: Intent.INTENT_B_NEARBY_BY_NEED.value,
-            Intent.INTENT_C_ITINERARY.value: Intent.INTENT_C_ITINERARY.value,
+            Intent.INTENT_C_ITINERARY.value: "itinerary_collect",
             Intent.INTENT_D_FOOD_DIETARY.value: Intent.INTENT_D_FOOD_DIETARY.value,
             Intent.INTENT_E_FRIENDS_BASED.value: Intent.INTENT_E_FRIENDS_BASED.value,
             Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value: Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
@@ -1548,6 +1552,13 @@ def _build_graph():
             "Health Emergency": "Health Emergency",
         },
     )
+
+    builder.add_conditional_edges(
+        "itinerary_collect",
+        itinerary_collect_decision,
+        {"ask": "clarification", "enrich": "itinerary_enrich"}
+    )
+    builder.add_edge("itinerary_enrich", Intent.INTENT_C_ITINERARY.value)
     builder.add_edge("clarification", END)
 
     for node in [
