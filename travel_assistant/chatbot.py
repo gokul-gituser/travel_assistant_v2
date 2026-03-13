@@ -22,11 +22,134 @@ from typing import Optional, List, Literal
 from pydantic import BaseModel
 from datetime import datetime
 
+import math
+import requests
+
 from intents import Intent, IntentClassificationResult
 from router import route_intent
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+# ── Overpass helpers ───────────────────────────────────────────────────────
+ 
+def _calculate_distance(lat1, lon1, lat2, lon2) -> float:
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi    = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = (math.sin(dphi / 2) ** 2
+         + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+ 
+ 
+def _geocode_city(city: str) -> Optional[Dict]:
+    """City name → {lat, lng} via Nominatim."""
+    try:
+        res = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": city, "format": "json", "limit": 1},
+            headers={"User-Agent": "travel-assistant-app"},
+            timeout=10,
+        )
+        results = res.json()
+        if results:
+            return {"lat": float(results[0]["lat"]), "lng": float(results[0]["lon"])}
+    except Exception as e:
+        print(f"⚠️ Geocode failed for '{city}': {e}")
+    return None
+ 
+ 
+def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
+    """
+    Fetch tourist-relevant places within 5km of destination centre.
+    Covers attractions, museums, restaurants, cafes, parks.
+    """
+    query = f"""
+    [out:json][timeout:30];
+    (
+      node(around:5000,{lat},{lng})["tourism"="attraction"];
+      node(around:5000,{lat},{lng})["tourism"="museum"];
+      node(around:5000,{lat},{lng})["amenity"="restaurant"];
+      node(around:5000,{lat},{lng})["amenity"="cafe"];
+      node(around:5000,{lat},{lng})["leisure"="park"];
+      way(around:5000,{lat},{lng})["tourism"="attraction"];
+      way(around:5000,{lat},{lng})["tourism"="museum"];
+      way(around:5000,{lat},{lng})["leisure"="park"];
+    );
+    out center 60;
+    """
+    try:
+        resp = requests.post(
+            "https://overpass-api.de/api/interpreter",
+            data={"data": query},
+            timeout=35,
+        )
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+    except Exception as e:
+        print(f"⚠️ Overpass itinerary fetch failed: {e}")
+        return []
+ 
+    places = []
+    for el in data.get("elements", []):
+        tags  = el.get("tags", {})
+        name  = tags.get("name")
+        if not name:
+            continue
+        plat = el.get("lat") or el.get("center", {}).get("lat")
+        plng = el.get("lon") or el.get("center", {}).get("lon")
+        if not plat or not plng:
+            continue
+        places.append({
+            "name":          name,
+            "type":          tags.get("tourism") or tags.get("amenity") or tags.get("leisure") or "place",
+            "lat":           plat,
+            "lng":           plng,
+            "distance":      round(_calculate_distance(lat, lng, plat, plng), 0),
+            "opening_hours": tags.get("opening_hours", ""),
+            "cuisine":       tags.get("cuisine", ""),
+        })
+ 
+    # Sort by distance, deduplicate by name, cap at 40
+    places.sort(key=lambda x: x["distance"])
+    seen, unique = set(), []
+    for p in places:
+        if p["name"] not in seen:
+            seen.add(p["name"])
+            unique.append(p)
+    return unique[:40]
+ 
+ 
+def _format_places_for_llm(places: List[Dict]) -> str:
+    """Group places by type and format as a compact block for the LLM."""
+    groups: Dict[str, List] = {
+        "attractions": [], "museums": [],
+        "restaurants": [], "cafes":   [], "parks": [],
+    }
+    mapping = {
+        "attraction": "attractions", "museum": "museums",
+        "restaurant": "restaurants", "cafe":   "cafes", "park": "parks",
+    }
+    for p in places:
+        bucket = mapping.get(p["type"], "attractions")
+        groups[bucket].append(p)
+ 
+    lines = ["REAL PLACES IN DESTINATION (OpenStreetMap data):"]
+    for category, items in groups.items():
+        if not items:
+            continue
+        lines.append(f"\n{category.upper()}:")
+        for p in items[:10]:
+            dist  = f"{int(p['distance'])}m" if p["distance"] < 1000 else f"{p['distance']/1000:.1f}km"
+            extra = []
+            if p.get("cuisine"):       extra.append(p["cuisine"])
+            if p.get("opening_hours"): extra.append(p["opening_hours"])
+            suffix = f" ({', '.join(extra)})" if extra else ""
+            lines.append(f"  - {p['name']}{suffix} — {dist} from city centre")
+    return "\n".join(lines)
+ 
 
 
 llm = ChatOpenAI(model="gpt-4o-mini")
@@ -66,6 +189,23 @@ PLACES LIST RULES — FOLLOW EXACTLY:
 - After your intro sentence, output this token on its own line: <<<PLACES_LIST>>>
 - The complete sorted place list will be inserted automatically after your response.
 - Do not add anything after <<<PLACES_LIST>>>."""
+
+# ── Param extraction ───────────────────────────────────────────────────────
+ 
+_EXTRACTOR_PROMPT = """Extract itinerary details from this message.
+ 
+User message: "{message}"
+ 
+Return ONLY a raw JSON object — no markdown, no explanation:
+{{
+    "destination": null,
+    "num_days":    null
+}}
+ 
+Rules:
+- destination: city or place name as a string, null if not mentioned
+- num_days: integer, null if not mentioned. "a day" = 1, "a weekend" = 2, "a week" = 7
+"""
 
 
 SYSTEM_PROMPT_NEARBY_GENERIC = """You are a helpful travel assistant that helps users find places near them such as cafes, clinics, hospitals, pharmacies, cinemas, parks, restaurants, attractions, and other venues.
@@ -176,22 +316,53 @@ Location: {{location_context}}
 NEARBY PLACES:
 {{nearby_places}}""".format(places_list_rules=_PLACES_LIST_RULES)
 
-SYSTEM_PROMPT_ITINERARY = """You are a travel planning expert.
-You create detailed, personalized day plans and itineraries.
-
-User Profile:
+ 
+SYSTEM_PROMPT_ITINERARY_V2 = """You are an expert travel planner creating personalised day-by-day itineraries.
+ 
+You will receive real places fetched from OpenStreetMap for the destination.
+Use ONLY these real places when naming specific venues. Never invent places.
+ 
+OUTPUT FORMAT — follow this exactly:
+  Day 1 — [short theme]
+    09:00  Place Name (type) — one sentence why it fits
+    11:00  Next Place — brief note
+    13:00  Lunch: Restaurant Name — cuisine note
+    ...
+    19:00  Dinner: Restaurant Name — vibe note
+ 
+  Day 2 — ...
+ 
+  🗺️ Travel note: [distance from current location + how to get there]
+ 
+RULES:
+- Use ONLY places from the list below
+- One sentence max per place
+- Group places by proximity to minimise walking
+- Match restaurants to cuisine preference and budget
+- If a category has no options, skip it gracefully
+- If num_days exceeds available attractions, suggest half-day alternatives or nearby day trips
+ 
+━━━ CONTEXT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+User profile:
 {user_profile}
-
-If the user says things that could include checking previous results like "show me cheaper ones", "more options", "something different" — 
-use the previous results provided to refine your response accordingly.
-Previous Results:
+ 
+Trip parameters:
+  Destination:      {destination}
+  Days:             {num_days}
+  Party size:       {party_size}
+  Budget:           {budget}
+  City transport:   {transport_mode}
+  From user's location: {travel_distance}
+  Cuisine preference:   {cuisine}
+ 
+Travel history (avoid re-recommending visited places):
+{travel_history}
+ 
+Previous results:
 {last_results}
-
-User's Current Location:
-Location: {location_context}
-
-Travel History:
-{travel_history}"""
+ 
+{places_block}
+"""
 
 SYSTEM_PROMPT_FRIENDS_BASED = """You are a travel assistant specializing in recommendations based on a user’s friends, social circle, or people they know.
 
@@ -401,6 +572,16 @@ Return a JSON object with these fields (use null if not mentioned):
 User message: {message}
 
 Return ONLY the JSON object, no other text."""
+
+def _extract_params(llm, message: str) -> Dict:
+    import json
+    from langchain_core.messages import HumanMessage
+    try:
+        resp = llm.invoke([HumanMessage(content=_EXTRACTOR_PROMPT.format(message=message))])
+        return json.loads(resp.content)
+    except Exception as e:
+        print(f"⚠️ Itinerary param extraction failed: {e}")
+        return {}
 
 class IntentScores(BaseModel):
     """Structured intent classification output."""
@@ -847,6 +1028,106 @@ def handle_clarification(state: GraphState, config: RunnableConfig, *, store: Ba
     return state
    
 
+
+# ── Node 1: collect_itinerary_context ─────────────────────────────────────
+ 
+def collect_itinerary_context(state, config, *, store):
+    """
+    Extract destination + num_days from the user message.
+    Only asks a clarification question if num_days is missing.
+    Destination missing → LLM will handle it naturally downstream.
+    Everything else (party, budget, transport) uses sensible defaults.
+    """
+    from langchain_core.messages import AIMessage
+ 
+    user_msg  = state["messages"][-1].content
+    extracted = _extract_params(llm, user_msg)
+ 
+    # Merge with context_builder values where available
+    preferences = state.get("preferences") or {}
+    party       = state.get("party") or {}
+ 
+    itinerary_context = {
+        "destination":    extracted.get("destination"),
+        "num_days":       extracted.get("num_days"),
+        # Defaults — filled from context_builder or sensible fallbacks
+        "party_size":     party.get("size") or 1,
+        "budget":         preferences.get("budget") or "mid-range",
+        "transport_mode": "walking",
+        "cuisine":        preferences.get("cuisine"),
+        "vibe":           preferences.get("vibe"),
+    }
+ 
+    print(f"\n🗺️  Itinerary context: {itinerary_context}")
+ 
+    # Only num_days triggers clarification
+    if not itinerary_context["num_days"]:
+        question = "How many days are you planning for this trip?"
+        print("❓ Asking for number of days")
+        return {
+            "itinerary_context": {**itinerary_context, "_needs_days": True},
+            "messages": [AIMessage(content=question)],
+        }
+ 
+    return {"itinerary_context": itinerary_context}
+ 
+ 
+def itinerary_collect_decision(state) -> str:
+    """Route to clarification if num_days missing, else proceed to enrich."""
+    ctx = state.get("itinerary_context", {})
+    if ctx.get("_needs_days"):
+        return "ask"
+    return "enrich"
+ 
+ 
+# ── Node 2: enrich_itinerary_data ──────────────────────────────────────────
+ 
+def enrich_itinerary_data(state, config, *, store):
+    """
+    Geocode destination → fetch real places from Overpass.
+    Calculates travel distance from user's current location if available.
+    """
+    ctx      = state.get("itinerary_context") or {}
+    location = state.get("location")
+    dest     = ctx.get("destination", "")
+ 
+    print(f"\n🌍 Enriching itinerary data for: '{dest}'")
+ 
+    if not dest:
+        print("⚠️ No destination — skipping enrichment")
+        return {"itinerary_places": []}
+ 
+    dest_coords = _geocode_city(dest)
+    if not dest_coords:
+        print(f"⚠️ Could not geocode '{dest}' — proceeding without place data")
+        return {"itinerary_places": []}
+ 
+    # Travel distance from user's current location
+    travel_distance_km = None
+    if location:
+        travel_distance_km = round(
+            _calculate_distance(
+                location["lat"], location["lng"],
+                dest_coords["lat"], dest_coords["lng"],
+            ) / 1000, 1
+        )
+        print(f"📏 Travel distance to {dest}: {travel_distance_km} km")
+ 
+    raw_places = _fetch_destination_places(dest_coords["lat"], dest_coords["lng"])
+    print(f"✅ Fetched {len(raw_places)} places for {dest}")
+ 
+    return {
+        "itinerary_places": raw_places,
+        "itinerary_context": {
+            **ctx,
+            "dest_lat":            dest_coords["lat"],
+            "dest_lng":            dest_coords["lng"],
+            "travel_distance_km":  travel_distance_km,
+        },
+    }
+ 
+ 
+
 def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Find nearby places"""
     user_id = config["configurable"].get("user_id")
@@ -946,40 +1227,64 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
              "last_results": [{"handler": Intent.INTENT_B_NEARBY_BY_NEED.value, "response": response.content}]} 
 
 
-def handle_itinerary(state: GraphState, config: RunnableConfig, *, store: BaseStore):
-    """Create day plans/itineraries"""
-    user_id = config["configurable"].get("user_id")
-    user_profile_text = get_user_profile_text(store, user_id)
 
+# ── Node 3: handle_itinerary (enhanced) ───────────────────────────────────
+ 
+def handle_itinerary(state, config, *, store):
+    """
+    Generate the itinerary using real Overpass place data + full user context.
+    Replaces the original handle_itinerary entirely.
+    """
+    from langchain_core.messages import SystemMessage, AIMessage
+ 
+    user_id             = config["configurable"].get("user_id")
+    user_profile_text   = get_user_profile_text(store, user_id)
     travel_history_text = get_travel_history_text(store, user_id)
-
-    # context for system prompt
-    location = state.get("location")
-    nearby = state.get("nearby_context") or ""
-    time_context = state.get("time_context")
-    preferences = state.get("preferences")
-    last_results = state.get("last_results") 
-    
-    context_text = f"""
-    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
-    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
-    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
-"""
-    
-    system_prompt = SYSTEM_PROMPT_ITINERARY.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
-    
+ 
+    ctx          = state.get("itinerary_context") or {}
+    raw_places   = state.get("itinerary_places") or []
+    last_results = state.get("last_results")
+ 
+    places_block = (
+        _format_places_for_llm(raw_places)
+        if raw_places
+        else "No place data available — use your general knowledge of the destination."
+    )
+ 
+    travel_km  = ctx.get("travel_distance_km")
+    travel_str = f"{travel_km} km from your current location" if travel_km else "Distance not available"
+ 
+    system_prompt = SYSTEM_PROMPT_ITINERARY_V2.format(
+        user_profile   = user_profile_text,
+        destination    = ctx.get("destination", "the destination"),
+        num_days       = ctx.get("num_days", 1),
+        party_size     = ctx.get("party_size", 1),
+        budget         = ctx.get("budget", "mid-range"),
+        transport_mode = ctx.get("transport_mode", "walking"),
+        travel_distance = travel_str,
+        cuisine        = ctx.get("cuisine") or "no preference",
+        travel_history = travel_history_text,
+        last_results   = last_results or "No previous results",
+        places_block   = places_block,
+    )
+ 
     response = llm.invoke([
         SystemMessage(content=system_prompt),
-        *state["messages"]
+        *state["messages"],
     ])
-    print("\n===== AI RESPONSE =====")
-    print(response.content)
-    print("=======================\n")
-    
-    return {"messages": [AIMessage(content=response.content)],
-             "last_results": [{"handler": Intent.INTENT_C_ITINERARY.value, "response": response.content}]} 
-
+ 
+    print("\n===== AI RESPONSE (ITINERARY) =====")
+    print(response.content[:400], "...")
+    print("===================================\n")
+ 
+    return {
+        "messages": [AIMessage(content=response.content)],
+        "last_results": [{
+            "handler":  Intent.INTENT_C_ITINERARY.value,
+            "response": response.content,
+        }],
+    }
+ 
 
 def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Food & dietary recommendations"""
