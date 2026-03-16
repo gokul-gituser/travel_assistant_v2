@@ -204,7 +204,14 @@ Return ONLY a raw JSON object — no markdown, no explanation:
  
 Rules:
 - destination: city or place name as a string, null if not mentioned
-- num_days: integer, null if not mentioned. "a day" = 1, "a weekend" = 2, "a week" = 7
+- num_days: integer, null if not mentioned. Examples:
+    "plan my day" = 1
+    "5 day trip" = 5
+    "3 days in Paris" = 3
+    "a weekend" = 2
+    "a week" = 7
+    "two days" = 2
+- If no number is stated, return null
 """
 
 
@@ -319,10 +326,11 @@ NEARBY PLACES:
  
 SYSTEM_PROMPT_ITINERARY_V2 = """You are an expert travel planner creating personalised day-by-day itineraries.
  
+
 You will receive real places fetched from OpenStreetMap for the destination.
 Use ONLY these real places when naming specific venues. Never invent places.
  
-OUTPUT FORMAT — follow this exactly:
+OUTPUT FORMAT — follow this format:
   Day 1 — [short theme]
     09:00  Place Name (type) — one sentence why it fits
     11:00  Next Place — brief note
@@ -330,11 +338,13 @@ OUTPUT FORMAT — follow this exactly:
     ...
     19:00  Dinner: Restaurant Name — vibe note
  
-  Day 2 — ...
+  Day 2 — ...   ← repeat for ALL {num_days} days
+  Day 3 — ...   ← repeat for ALL {num_days} days
  
   🗺️ Travel note: [distance from current location + how to get there]
  
 RULES:
+- CRITICAL: Generate exactly {num_days} days — no more, no less
 - Use ONLY places from the list below
 - One sentence max per place
 - Group places by proximity to minimise walking
@@ -682,6 +692,9 @@ class GraphState(TypedDict):
     safety_mode: str  # "normal" | "urgent_health"
     last_results: Optional[List[Dict]]
     location_history_text: Optional[str]
+
+    itinerary_context: Optional[Dict]      # destination, num_days, defaults
+    itinerary_places:  Optional[List[Dict]] # real places from Overpass
     
     # Intent routing
     classification: Optional[Dict]
