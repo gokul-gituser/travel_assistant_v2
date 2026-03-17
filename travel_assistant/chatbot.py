@@ -596,7 +596,7 @@ User message: {message}
 Return ONLY the JSON object, no other text."""
 
 def _extract_params(llm, message: str) -> Dict:
-      """
+    """
     Extract all 8 itinerary parameters from a user message.
     
     Returns a dict with keys: destination, current_location, num_days, party_size,
