@@ -2,6 +2,7 @@ import os
 from pyexpat.errors import messages
 from unittest import result
 import uuid
+import json
 import logging
 from typing import Annotated, Optional, Dict, List, TypedDict
 from dotenv import load_dotenv
@@ -192,26 +193,37 @@ PLACES LIST RULES — FOLLOW EXACTLY:
 
 # ── Param extraction ───────────────────────────────────────────────────────
  
-_EXTRACTOR_PROMPT = """Extract itinerary details from this message.
- 
+_EXTRACTOR_PROMPT = """Extract itinerary planning details from this message.
+
 User message: "{message}"
- 
+
 Return ONLY a raw JSON object — no markdown, no explanation:
 {{
     "destination": null,
-    "num_days":    null
+    "current_location": null,
+    "num_days": null,
+    "party_size": null,
+    "transport_to": null,
+    "transport_within": null,
+    "cuisine": null,
+    "interests": null
 }}
- 
+
 Rules:
 - destination: city or place name as a string, null if not mentioned
-- num_days: integer, null if not mentioned. Examples:
-    "plan my day" = 1
-    "5 day trip" = 5
-    "3 days in Paris" = 3
-    "a weekend" = 2
-    "a week" = 7
-    "two days" = 2
-- If no number is stated, return null
+- current_location: where user is currently / traveling from, null if not mentioned
+- num_days: integer number of days. Examples: "plan my day"=1, "5 day trip"=5, "weekend"=2, "week"=7, null if not mentioned
+- party_size: integer (number of people). Examples: "solo"=1, "couple"=2, "with kids"=family size, null if not mentioned
+- transport_to: how they'll get to the destination (fly, train, drive, bus, ship, etc.). null if not mentioned
+- transport_within: how they'll get around IN the destination (walking, transit, metro, taxi, car, bike, etc.). null if not mentioned
+- cuisine: food preferences (vegetarian, halal, vegan, gluten-free, local, Italian, Asian, etc.). null if not mentioned
+- interests: what they enjoy doing (history, museums, nature, hiking, nightlife, beach, food, shopping, adventure, family activities, etc.). null if not mentioned
+
+IMPORTANT:
+- Only extract what is EXPLICITLY stated
+- If a field is not mentioned, return null
+- If the message is unclear about a field, return null — don't infer
+- Return null, not empty string or false
 """
 
 
@@ -584,13 +596,45 @@ User message: {message}
 Return ONLY the JSON object, no other text."""
 
 def _extract_params(llm, message: str) -> Dict:
-    import json
-    from langchain_core.messages import HumanMessage
+      """
+    Extract all 8 itinerary parameters from a user message.
+    
+    Returns a dict with keys: destination, current_location, num_days, party_size,
+    transport_to, transport_within, cuisine, interests
+    
+    Only includes keys with non-null values.
+    """
+    
     try:
-        resp = llm.invoke([HumanMessage(content=_EXTRACTOR_PROMPT.format(message=message))])
-        return json.loads(resp.content)
+        resp = llm.invoke([HumanMessage(content=_EXTRACTOR_PROMPT_ENHANCED.format(message=message))])
+        data = json.loads(resp.content)
+        
+        # Validate we got a dict
+        if not isinstance(data, dict):
+            logger.warning(f"Extractor returned non-dict: {type(data)}")
+            return {}
+        
+        # Filter to only include non-null, non-empty values
+        cleaned = {}
+        for k, v in data.items():
+            if v is not None and v != "" and v != "null":
+                # Handle numeric strings
+                if k in ["num_days", "party_size"]:
+                    try:
+                        cleaned[k] = int(v) if isinstance(v, str) else v
+                    except ValueError:
+                        logger.warning(f"Could not convert {k}={v} to int")
+                else:
+                    cleaned[k] = v
+        
+        logger.info(f"✅ Extracted parameters: {list(cleaned.keys())}")
+        return cleaned
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error in parameter extraction: {e}")
+        return {}
     except Exception as e:
-        print(f"⚠️ Itinerary param extraction failed: {e}")
+        logger.error(f"⚠️ Parameter extraction failed: {e}")
         return {}
 
 class IntentScores(BaseModel):
@@ -1044,53 +1088,104 @@ def handle_clarification(state: GraphState, config: RunnableConfig, *, store: Ba
 
 
 # ── Node 1: collect_itinerary_context ─────────────────────────────────────
- 
+COLLECTION_QUESTIONS = {
+    "destination": "Where are you planning to travel to? (e.g., Paris, Tokyo, New York)",
+    "current_location": "Where are you traveling from? What's your current location?",
+    "num_days": "How many days are you planning for this trip?",
+    "party_size": "How many people are traveling? (including yourself)",
+    "transport_to": "How will you get to {destination}? (e.g., fly, train, drive, bus)",
+    "transport_within": "How do you prefer to get around within {destination}? (walk, metro, taxi, car, bike)",
+    "cuisine": "Do you have any food preferences? (e.g., vegetarian, halal, local cuisine, no preference)",
+    "interests": "What are your main interests? (e.g., history, nature, nightlife, family activities, adventure, food, shopping)",
+}
+
+COLLECTION_ORDER = [
+    "destination",
+    "current_location", 
+    "num_days",
+    "party_size",
+    "transport_to",
+    "transport_within",
+    "cuisine",
+    "interests",
+]
+
 def collect_itinerary_context(state, config, *, store):
     """
-    Extract destination + num_days from the user message.
-    Only asks a clarification question if num_days is missing.
-    Destination missing → LLM will handle it naturally downstream.
-    Everything else (party, budget, transport) uses sensible defaults.
+    Multi-turn collection of itinerary parameters.
+    
+    Process:
+    1. Extract parameters from latest user message using LLM
+    2. Merge with existing context (don't overwrite confirmed values)
+    3. Auto-fill current_location from device location if available
+    4. Find first missing required field
+    5. Ask for it, or proceed to enrichment if all collected
     """
-    from langchain_core.messages import AIMessage
- 
-    user_msg  = state["messages"][-1].content
-    extracted = _extract_params(llm, user_msg)
- 
-    # Merge with context_builder values where available
-    preferences = state.get("preferences") or {}
-    party       = state.get("party") or {}
- 
-    itinerary_context = {
-        "destination":    extracted.get("destination"),
-        "num_days":       extracted.get("num_days"),
-        # Defaults — filled from context_builder or sensible fallbacks
-        "party_size":     party.get("size") or 1,
-        "budget":         preferences.get("budget") or "mid-range",
-        "transport_mode": "walking",
-        "cuisine":        preferences.get("cuisine"),
-        "vibe":           preferences.get("vibe"),
-    }
- 
-    print(f"\n🗺️  Itinerary context: {itinerary_context}")
- 
-    # Only num_days triggers clarification
-    if not itinerary_context["num_days"]:
-        question = "How many days are you planning for this trip?"
-        print("❓ Asking for number of days")
+ # Get existing context (from previous turns)
+    ctx = state.get("itinerary_context") or {}
+    user_msg = state["messages"][-1].content
+    
+    # 1. Extract parameters from this message
+    extracted = _extract_params_enhanced(llm, user_msg)
+    logger.info(f"Extracted from message: {extracted}")
+    
+    # 2. Merge extracted params (only if not already confirmed in ctx)
+    for key, value in extracted.items():
+        if not ctx.get(key):  # Don't overwrite if already set
+            ctx[key] = value
+    
+    # 3. Auto-fill current_location from device location if available
+    if not ctx.get("current_location") and state.get("location"):
+        loc = state["location"]
+        ctx["current_location"] = loc.get("city", f"{loc.get('lat')}, {loc.get('lng')}")
+        logger.info(f"Auto-filled current_location from device: {ctx['current_location']}")
+    
+    # 4. Find first missing required field
+    missing_field = None
+    for field_name in COLLECTION_ORDER:
+        if not ctx.get(field_name):
+            missing_field = field_name
+            break
+    
+    # 5. If missing field found, ask for it
+    if missing_field:
+        question = COLLECTION_QUESTIONS[missing_field]
+        
+        # Format question with known destination if needed
+        if "{destination}" in question and ctx.get("destination"):
+            question = question.format(destination=ctx["destination"])
+        
+        logger.info(f"❓ Asking for missing field: {missing_field}")
+        print(f"❓ Asking for missing field: {missing_field}")
+        
         return {
-            "itinerary_context": {**itinerary_context, "_needs_days": True},
+            "itinerary_context": {**ctx, "_pending_field": missing_field},
             "messages": [AIMessage(content=question)],
         }
- 
-    return {"itinerary_context": itinerary_context}
+    
+    # All params collected!
+    logger.info(f"✅ All itinerary context collected!")
+    print(f"✅ All itinerary context collected: {ctx}")
+    
+    return {"itinerary_context": ctx}
  
  
 def itinerary_collect_decision(state) -> str:
-    """Route to clarification if num_days missing, else proceed to enrich."""
+    """
+    Decide whether to keep asking (if fields are missing) or proceed to enrichment.
+    
+    Returns:
+    - "ask": Stay in collection, ask next question
+    - "enrich": All fields collected, proceed to enrich_itinerary_data
+    """
     ctx = state.get("itinerary_context", {})
-    if ctx.get("_needs_days"):
-        return "ask"
+    
+    # Check if any required field is still missing
+    for field_name in COLLECTION_ORDER:
+        if not ctx.get(field_name):
+            return "ask"
+    
+    # All fields present
     return "enrich"
  
  
@@ -1106,8 +1201,10 @@ def enrich_itinerary_data(state, config, *, store):
     dest     = ctx.get("destination", "")
  
     print(f"\n🌍 Enriching itinerary data for: '{dest}'")
+    logger.info(f"Full itinerary context: {ctx}")
  
     if not dest:
+        logger.error(f"❌ CRITICAL: No destination in context! ctx={ctx}")
         print("⚠️ No destination — skipping enrichment")
         return {"itinerary_places": []}
  
@@ -1270,11 +1367,11 @@ def handle_itinerary(state, config, *, store):
  
     system_prompt = SYSTEM_PROMPT_ITINERARY_V2.format(
         user_profile   = user_profile_text,
-        destination    = ctx.get("destination", "the destination"),
+        destination    = ctx.get("destination", "Unknown destination"),
         num_days       = ctx.get("num_days", 1),
         party_size     = ctx.get("party_size", 1),
         budget         = ctx.get("budget", "mid-range"),
-        transport_mode = ctx.get("transport_mode", "walking"),
+        transport_mode = ctx.get("transport_within", "walking"),
         travel_distance = travel_str,
         cuisine        = ctx.get("cuisine") or "no preference",
         travel_history = travel_history_text,
@@ -1570,7 +1667,7 @@ def _build_graph():
     builder.add_conditional_edges(
         "itinerary_collect",
         itinerary_collect_decision,
-        {"ask": "clarification", "enrich": "itinerary_enrich"}
+        {"ask": "itinerary_collect", "enrich": "itinerary_enrich"}  # Loop back to ask for next field
     )
     builder.add_edge("itinerary_enrich", Intent.INTENT_C_ITINERARY.value)
     builder.add_edge("clarification", END)
