@@ -1126,7 +1126,7 @@ def collect_itinerary_context(state, config, *, store):
     user_msg = state["messages"][-1].content
     
     # 1. Extract parameters from this message
-    extracted = _extract_params_enhanced(llm, user_msg)
+    extracted = _extract_params(llm, user_msg)
     logger.info(f"Extracted from message: {extracted}")
     
     # 2. Merge extracted params (only if not already confirmed in ctx)
