@@ -55,7 +55,10 @@ def _geocode_city(city: str) -> Optional[Dict]:
         )
         results = res.json()
         if results:
-            return {"lat": float(results[0]["lat"]), "lng": float(results[0]["lon"])}
+            lat = float(results[0]["lat"])
+            lng = float(results[0]["lon"])
+            print(f"🌍 Geocoded '{city}' → ({lat}, {lng})")
+            return {"lat": lat, "lng": lng}
     except Exception as e:
         print(f"⚠️ Geocode failed for '{city}': {e}")
     return None
@@ -1285,6 +1288,7 @@ def enrich_itinerary_data(state, config, *, store):
         )
         print(f"📏 Travel distance to {dest}: {travel_distance_km} km")
  
+    print(f"📍 Destination coords used: {lat}, {lng}")
     raw_places = _fetch_destination_places(dest_coords["lat"], dest_coords["lng"])
     print(f"✅ Fetched {len(raw_places)} places for {dest}")
  
