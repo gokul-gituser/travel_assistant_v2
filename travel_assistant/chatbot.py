@@ -606,7 +606,7 @@ def _extract_params(llm, message: str) -> Dict:
     """
     
     try:
-        resp = llm.invoke([HumanMessage(content=_EXTRACTOR_PROMPT_ENHANCED.format(message=message))])
+        resp = llm.invoke([HumanMessage(content=_EXTRACTOR_PROMPT.format(message=message))])
         data = json.loads(resp.content)
         
         # Validate we got a dict
@@ -803,23 +803,27 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     except Exception as e:
         logger.warning(f"Context extraction failed: {e}")
 
+    prev_party = state.get("party") or {}
+
     party = PartyContext(
-        type=extracted.get("party_type"),
-        size=extracted.get("party_size"),
-        mobility_needs=extracted.get("mobility_needs")
+        type=extracted.get("party_type") or prev_party.get("type"),
+        size=extracted.get("party_size") or prev_party.get("size"),
+        mobility_needs=extracted.get("mobility_needs") or prev_party.get("mobility_needs"),
     )
 
+    prev_preferences = state.get("preferences") or {}
     preferences = PreferencesContext(
-        budget=extracted.get("budget"),
-        cuisine=extracted.get("cuisine"),
-        vibe=extracted.get("vibe"),
-        pace=extracted.get("pace")
+        budget=extracted.get("budget") or prev_preferences.get("budget"),
+        cuisine=extracted.get("cuisine") or prev_preferences.get("cuisine"),
+        vibe=extracted.get("vibe") or prev_preferences.get("vibe"),
+        pace=extracted.get("pace") or prev_preferences.get("pace"),
     )
 
+    prev_constraints = state.get("constraints") or {}
     constraints = ConstraintsContext(
-        radius_m=extracted.get("radius_m"),
-        open_now=extracted.get("open_now"),
-        transport_mode=extracted.get("transport_mode")
+        radius_m=extracted.get("radius_m") or prev_constraints.get("radius_m"),
+        open_now=extracted.get("open_now") or prev_constraints.get("open_now"),
+        transport_mode=extracted.get("transport_mode") or prev_constraints.get("transport_mode")
     )
     print(f"\n--- CONTEXT BUILT ---")
     print(f"Location: {location}")
@@ -965,6 +969,23 @@ def get_travel_history_text(store: BaseStore, user_id: str) -> str:
 
 def router_node(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     user_msg = state["messages"][-1].content
+
+        # If already in itinerary flow, don't re-classify
+    if state.get("itinerary_context"):
+        return {
+            "classification": {
+                "primary_intent": Intent.INTENT_C_ITINERARY.value,
+                "confidence": 1.0,
+                "intent_scores": {},
+                "needs_clarification": False,
+                "safety_override": False,
+            },
+            "routing": {
+                "action": "ROUTE",
+                "target_intent": Intent.INTENT_C_ITINERARY.value,
+            },
+            "previous_intent": Intent.INTENT_C_ITINERARY,
+        }
 
     classification = classify_intent(user_msg)
     decision = route_intent(classification)
@@ -1203,6 +1224,7 @@ def collect_itinerary_context(state, config, *, store):
     itinerary_messages.append(HumanMessage(content=user_msg))
     
     return {
+        **state,
         "itinerary_context": ctx,
         "itinerary_messages": itinerary_messages,  # ← Return history
         }
@@ -1737,7 +1759,7 @@ def _build_graph():
         },
     )
 
-   builder.add_conditional_edges(
+    builder.add_conditional_edges(
         "itinerary_collect",
         should_proceed_to_enrichment,  # ✅ Correct function
         {
@@ -1772,11 +1794,15 @@ def _build_graph():
             store.setup()
             graph = builder.compile(checkpointer=checkpointer, store=store)
 
+        """    mermaid = graph.get_graph().draw_mermaid()
+            with open("chatbot_graph_1.mmd", "w", encoding="utf-8") as f:
+                f.write(mermaid)
+            print("Wrote: chatbot_graph_1.mmd")
+"""
+            
+
     return graph
-            # mermaid = graph.get_graph().draw_mermaid()
-            # with open("chatbot_graph_4.mmd", "w", encoding="utf-8") as f:
-            #     f.write(mermaid)
-            # print("Wrote: chatbot_graph_4.mmd")
+    
 
 _graph = None
 

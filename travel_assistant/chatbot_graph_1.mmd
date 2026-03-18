@@ -1,0 +1,49 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	context_builder(context_builder)
+	router(router)
+	INTENT_A_NEARBY_GENERIC(INTENT_A_NEARBY_GENERIC)
+	INTENT_B_NEARBY_BY_NEED(INTENT_B_NEARBY_BY_NEED)
+	itinerary_collect(itinerary_collect)
+	itinerary_enrich(itinerary_enrich)
+	INTENT_C_ITINERARY(INTENT_C_ITINERARY)
+	INTENT_D_FOOD_DIETARY(INTENT_D_FOOD_DIETARY)
+	INTENT_E_FRIENDS_BASED(INTENT_E_FRIENDS_BASED)
+	INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP(INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP)
+	clarification(clarification)
+	General\20Chat\2f\20Fallback(General Chat/ Fallback)
+	Health\20Emergency(Health Emergency)
+	write_memory(write_memory)
+	__end__([<p>__end__</p>]):::last
+	General\20Chat\2f\20Fallback --> write_memory;
+	Health\20Emergency --> write_memory;
+	INTENT_A_NEARBY_GENERIC --> write_memory;
+	INTENT_B_NEARBY_BY_NEED --> write_memory;
+	INTENT_C_ITINERARY --> write_memory;
+	INTENT_D_FOOD_DIETARY --> write_memory;
+	INTENT_E_FRIENDS_BASED --> write_memory;
+	INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP --> write_memory;
+	__start__ --> context_builder;
+	context_builder --> router;
+	itinerary_collect -. &nbsp;end&nbsp; .-> __end__;
+	itinerary_collect -. &nbsp;enrich&nbsp; .-> itinerary_enrich;
+	itinerary_enrich --> INTENT_C_ITINERARY;
+	router -.-> General\20Chat\2f\20Fallback;
+	router -.-> Health\20Emergency;
+	router -.-> INTENT_A_NEARBY_GENERIC;
+	router -.-> INTENT_B_NEARBY_BY_NEED;
+	router -.-> INTENT_D_FOOD_DIETARY;
+	router -.-> INTENT_E_FRIENDS_BASED;
+	router -.-> INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP;
+	router -.-> clarification;
+	router -. &nbsp;INTENT_C_ITINERARY&nbsp; .-> itinerary_collect;
+	clarification --> __end__;
+	write_memory --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
