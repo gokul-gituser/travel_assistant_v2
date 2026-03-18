@@ -1288,7 +1288,7 @@ def enrich_itinerary_data(state, config, *, store):
         )
         print(f"📏 Travel distance to {dest}: {travel_distance_km} km")
  
-    print(f"📍 Destination coords used: {lat}, {lng}")
+    
     raw_places = _fetch_destination_places(dest_coords["lat"], dest_coords["lng"])
     print(f"✅ Fetched {len(raw_places)} places for {dest}")
  
