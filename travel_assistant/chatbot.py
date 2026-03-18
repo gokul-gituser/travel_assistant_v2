@@ -123,6 +123,12 @@ def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
         if p["name"] not in seen:
             seen.add(p["name"])
             unique.append(p)
+
+    print(f"\n🧪 OVERPASS RESULT for destination ({lat}, {lng})")
+    print(f"Total places fetched: {len(places)}")
+
+    for p in places[:10]:
+        print(f" - {p['name']} ({p['type']}) | {p['distance']}m")
     return unique[:40]
  
  
@@ -1433,7 +1439,12 @@ def handle_itinerary(state, config, *, store):
  
     ctx          = state.get("itinerary_context") or {}
     itinerary_messages = state.get("itinerary_messages") or []  # ← Load history
+    
     raw_places   = state.get("itinerary_places") or []
+    print(f"\n🧪 DEBUG — itinerary raw_places count: {len(raw_places)}")
+
+    for p in raw_places[:10]:
+        print(f" - {p['name']} ({p['type']}) | {p['distance']}m")
     last_results = state.get("last_results")
  
     places_block = (
@@ -1441,6 +1452,8 @@ def handle_itinerary(state, config, *, store):
         if raw_places
         else "No place data available — use your general knowledge of the destination."
     )
+    print("\n🧪 PLACES BLOCK SENT TO LLM:\n")
+    print(places_block[:1000])  # truncate if large
  
     travel_km  = ctx.get("travel_distance_km")
     travel_str = f"{travel_km} km from your current location" if travel_km else "Distance not available"
