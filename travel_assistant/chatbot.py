@@ -737,9 +737,12 @@ class GraphState(TypedDict):
     last_results: Optional[List[Dict]]
     location_history_text: Optional[str]
 
+    previous_intent: Optional[str]
+
     itinerary_context: Optional[Dict]      # destination, num_days, defaults
     itinerary_places:  Optional[List[Dict]] # real places from Overpass
-    
+    itinerary_messages: Annotated[List[BaseMessage], add_messages]
+
     # Intent routing
     classification: Optional[Dict]
     routing: Optional[Dict]
@@ -968,13 +971,17 @@ def router_node(state: GraphState, config: RunnableConfig, *, store: BaseStore):
 
     #state["classification"] = classification
     #state["routing"] = decision
+
     
     print(f"\n{'='*60}")
     print(f"Primary Intent: {classification.primary_intent.value}")
     print(f"Router Decision: {decision.action.name}")
     print(f"{'='*60}\n")
 
-    return {
+    current_intent = classification.primary_intent
+    previous_intent = state.get("previous_intent")
+
+    result = {
         "classification": {
             "primary_intent": classification.primary_intent.value,
             "confidence": classification.confidence,
@@ -985,8 +992,21 @@ def router_node(state: GraphState, config: RunnableConfig, *, store: BaseStore):
         "routing": {
             "action": decision.action.value,
             "target_intent": decision.target_intent.value if decision.target_intent else None,
-        }
+        },
+        "previous_intent": current_intent,  # Track for next turn
     }
+    
+    #Clear itinerary context when switching intents
+    if previous_intent and previous_intent != current_intent:
+        if previous_intent == Intent.INTENT_C_ITINERARY:
+            logger.info(f"Switching from {previous_intent} to {current_intent}")
+            logger.info(f"Clearing itinerary context and message history")
+            
+            # Reset itinerary-specific state
+            result["itinerary_context"] = {}
+            result["itinerary_messages"] = []
+    
+    return result
 
 def router_decision(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     routing = state["routing"]
@@ -1123,11 +1143,14 @@ def collect_itinerary_context(state, config, *, store):
     """
  # Get existing context (from previous turns)
     ctx = state.get("itinerary_context") or {}
+    itinerary_messages = state.get("itinerary_messages") or []
+
+    logger.info(f"📦 Loaded context: {list(ctx.keys())}")
+    logger.info(f"📝 Message history: {len(itinerary_messages)} messages")
+
     user_msg = state["messages"][-1].content
-    
     # 1. Extract parameters from this message
     extracted = _extract_params(llm, user_msg)
-    logger.info(f"Extracted from message: {extracted}")
     
     # 2. Merge extracted params (only if not already confirmed in ctx)
     for key, value in extracted.items():
@@ -1156,18 +1179,33 @@ def collect_itinerary_context(state, config, *, store):
             question = question.format(destination=ctx["destination"])
         
         logger.info(f"❓ Asking for missing field: {missing_field}")
-        print(f"❓ Asking for missing field: {missing_field}")
+        ai_message = AIMessage(content=question)
+
+         # Store messages for context
+        itinerary_messages.append(HumanMessage(content=user_msg))
+        itinerary_messages.append(ai_message)
+
+        # Keep rolling window (max 10 messages = 5 pairs)
+        if len(itinerary_messages) > 10:
+            itinerary_messages = itinerary_messages[-10:]
+        
+        logger.info(f"📝 Message history: {len(itinerary_messages)} messages")
         
         return {
-            "itinerary_context": {**ctx, "_pending_field": missing_field},
-            "messages": [AIMessage(content=question)],
+            "itinerary_context": ctx,
+            "itinerary_messages": itinerary_messages,  # ← Return updated history
+            "messages": [ai_message],
         }
     
     # All params collected!
     logger.info(f"✅ All itinerary context collected!")
-    print(f"✅ All itinerary context collected: {ctx}")
+
+    itinerary_messages.append(HumanMessage(content=user_msg))
     
-    return {"itinerary_context": ctx}
+    return {
+        "itinerary_context": ctx,
+        "itinerary_messages": itinerary_messages,  # ← Return history
+        }
  
  
 def itinerary_collect_decision(state) -> str:
@@ -1197,6 +1235,7 @@ def enrich_itinerary_data(state, config, *, store):
     Calculates travel distance from user's current location if available.
     """
     ctx      = state.get("itinerary_context") or {}
+    itinerary_messages = state.get("itinerary_messages") or []
     location = state.get("location")
     dest     = ctx.get("destination", "")
  
@@ -1235,8 +1274,23 @@ def enrich_itinerary_data(state, config, *, store):
             "dest_lng":            dest_coords["lng"],
             "travel_distance_km":  travel_distance_km,
         },
+        "itinerary_messages": itinerary_messages,
     }
  
+def should_proceed_to_enrichment(state) -> str:
+    """Check if all itinerary fields collected."""
+    ctx = state.get("itinerary_context", {})
+    
+    required_fields = [
+        "destination", "current_location", "num_days", "party_size",
+        "transport_to", "transport_within", "cuisine", "interests"
+    ]
+    
+    for field in required_fields:
+        if not ctx.get(field):
+            return "end"  # Still collecting
+    
+    return "enrich"  # All collected, proceed
  
 
 def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: BaseStore):
@@ -1346,13 +1400,13 @@ def handle_itinerary(state, config, *, store):
     Generate the itinerary using real Overpass place data + full user context.
     Replaces the original handle_itinerary entirely.
     """
-    from langchain_core.messages import SystemMessage, AIMessage
  
     user_id             = config["configurable"].get("user_id")
     user_profile_text   = get_user_profile_text(store, user_id)
     travel_history_text = get_travel_history_text(store, user_id)
  
     ctx          = state.get("itinerary_context") or {}
+    itinerary_messages = state.get("itinerary_messages") or []  # ← Load history
     raw_places   = state.get("itinerary_places") or []
     last_results = state.get("last_results")
  
@@ -1378,10 +1432,28 @@ def handle_itinerary(state, config, *, store):
         last_results   = last_results or "No previous results",
         places_block   = places_block,
     )
+
+    # Add conversation context to prompt
+    conversation_context = ""
+    if itinerary_messages:
+        logger.info(f"Including {len(itinerary_messages)} messages in context")
+        conversation_context = "\n\n" + "="*60 + "\nCONVERSATION CONTEXT\n" + "="*60 + "\n"
+        conversation_context += "How the user built this itinerary:\n\n"
+        
+        # Include last 10 messages
+        for msg in itinerary_messages[-10:]:
+            if isinstance(msg, HumanMessage):
+                conversation_context += f"User: {msg.content}\n"
+            elif isinstance(msg, AIMessage):
+                conversation_context += f"Assistant: {msg.content}\n"
+        
+        conversation_context += "\n" + "="*60 + "\nUse this to personalize your response.\n"
  
+    enhanced_system_prompt = system_prompt + conversation_context
+
     response = llm.invoke([
-        SystemMessage(content=system_prompt),
-        *state["messages"],
+        SystemMessage(content=enhanced_system_prompt),
+        *state["messages"][-3:],
     ])
  
     print("\n===== AI RESPONSE (ITINERARY) =====")
@@ -1390,6 +1462,7 @@ def handle_itinerary(state, config, *, store):
  
     return {
         "messages": [AIMessage(content=response.content)],
+        "itinerary_messages": itinerary_messages,  # ← Keep history
         "last_results": [{
             "handler":  Intent.INTENT_C_ITINERARY.value,
             "response": response.content,
@@ -1664,10 +1737,13 @@ def _build_graph():
         },
     )
 
-    builder.add_conditional_edges(
+   builder.add_conditional_edges(
         "itinerary_collect",
-        itinerary_collect_decision,
-        {"ask": "itinerary_collect", "enrich": "itinerary_enrich"}  # Loop back to ask for next field
+        should_proceed_to_enrichment,  # ✅ Correct function
+        {
+            "end": END,                    # ✅ Routes to END when asking
+            "enrich": "itinerary_enrich"   # ✅ Routes to enrichment when ready
+        }
     )
     builder.add_edge("itinerary_enrich", Intent.INTENT_C_ITINERARY.value)
     builder.add_edge("clarification", END)
