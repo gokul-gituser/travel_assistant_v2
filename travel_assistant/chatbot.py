@@ -1704,7 +1704,9 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     # Save updated profile
     updated_profile = result["responses"][0].model_dump()
     store.put(namespace, "profile", updated_profile)
-"""
+
+    return state
+    """
     #location
     location = state.get("location")
     if location:
@@ -1765,7 +1767,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
         elif "no" in user_text:
             store.put(pending_namespace, "candidate", None)
     """ 
-    return state
+
 
 def _build_graph():
     builder = StateGraph(GraphState)
