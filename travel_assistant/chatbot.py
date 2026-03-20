@@ -1764,7 +1764,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
 
         elif "no" in user_text:
             store.put(pending_namespace, "candidate", None)
-   """ 
+    """ 
     return state
 
 def _build_graph():
