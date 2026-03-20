@@ -1704,7 +1704,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     # Save updated profile
     updated_profile = result["responses"][0].model_dump()
     store.put(namespace, "profile", updated_profile)
-
+"""
     #location
     location = state.get("location")
     if location:
@@ -1733,7 +1733,38 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
         logger.info(f"✓ Seeded travel history for {user_id}")
     
     logger.info(f"✓ Saved user profile for {user_id}")
-    
+
+    pending_namespace = ("pending_travel", user_id)
+    pending = store.get(pending_namespace, "candidate")
+
+    if pending and pending.value and not pending.value.get("confirmed"):
+
+        user_text = state["messages"][-1].content.lower()
+
+        if "yes" in user_text:
+
+            travel_namespace = ("travel_history", user_id)
+            existing = store.get(travel_namespace, "history")
+            history = existing.value if existing else []
+
+            new_trip = {
+                "number": len(history) + 1,
+                "country": pending.value.get("country"),
+                "city": pending.value.get("city"),
+                "places_visited": [],
+                "time_of_visit": datetime.now().strftime("%Y-%m"),
+                "hours_spent": 0
+            }
+
+            history.append(new_trip)
+            store.put(travel_namespace, "history", history)
+
+            pending.value["confirmed"] = True
+            store.put(pending_namespace, "candidate", pending.value)
+
+        elif "no" in user_text:
+            store.put(pending_namespace, "candidate", None)
+   """ 
     return state
 
 def _build_graph():
