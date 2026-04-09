@@ -1,7 +1,7 @@
 from typing import Tuple
 
-from config import AMBIGUITY_DELTA, HIGH_CONFIDENCE_THRESHOLD, LOW_CONFIDENCE_THRESHOLD
-from intents import Intent, IntentClassificationResult, RouterDecision, RoutingAction
+from .config import AMBIGUITY_DELTA, HIGH_CONFIDENCE_THRESHOLD, LOW_CONFIDENCE_THRESHOLD
+from .intents import Intent, IntentClassificationResult, RouterDecision, RoutingAction
 
 def route_intent(
     classification: IntentClassificationResult,

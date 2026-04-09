@@ -26,8 +26,8 @@ from datetime import datetime
 import math
 import requests
 
-from intents import Intent, IntentClassificationResult
-from router import route_intent
+from .intents import Intent, IntentClassificationResult
+from .router import route_intent
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -62,8 +62,9 @@ def _geocode_city(city: str) -> Optional[Dict]:
     except Exception as e:
         print(f"⚠️ Geocode failed for '{city}': {e}")
     return None
- 
- 
+
+
+#need modification
 def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
     """
     Fetch tourist-relevant places within 5km of destination centre.
@@ -1340,7 +1341,17 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     print("DEBUG: NEARBY CONTEXT SENT TO LLM:")
     print(nearby)
 
+    raw_places = config["configurable"].get("raw_places") or []
     last_results = state.get("last_results") 
+
+    if not nearby and last_results:
+        prev_places = last_results[0].get("raw_places", [])
+        if prev_places:
+            nearby = "\n".join(
+                f"{i+1}. {p['name']} ({p['type']}) — {p['distance']}m"
+                for i, p in enumerate(prev_places)
+            )
+            raw_places = prev_places  # keep for storage
 
     location_context = (
         f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
@@ -1350,12 +1361,7 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     location_history_text = state.get("location_history_text", "No location history yet")
 
     
-#     context_text = f"""
-#     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
-#     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-#     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
-#     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
-# """
+#    
     
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
     location_context=location_context
@@ -1372,7 +1378,10 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     print("=======================\n")
     
     return {"messages": [AIMessage(content=response.content)],
-            "last_results": [{"handler": Intent.INTENT_A_NEARBY_GENERIC.value, "response": response.content}]} 
+            "last_results": [{"handler": Intent.INTENT_A_NEARBY_GENERIC.value, 
+            "response": response.content,
+            "raw_places": raw_places,
+            }]} 
 
 
 def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: BaseStore):
@@ -1688,6 +1697,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     # Retrieve existing profile
     namespace = ("user_profile", user_id)
     existing_memory = store.get(namespace, "profile")
+    #existing profile wrapped because trustcall_extractor expects {"UserProfile": {...}}
     existing_profile = {"UserProfile": existing_memory.value} if existing_memory and existing_memory.value else None #added the and part
     
     # Extract updated profile from conversation
@@ -1879,6 +1889,7 @@ async def run_travel_assistant(
     location: Optional[dict] = None,
     thread_id: Optional[str] = None,
     nearby_context: Optional[str] = None,
+    raw_places: Optional[list] = None,
 ) -> str:
 
     graph = _get_graph()
@@ -1891,6 +1902,7 @@ async def run_travel_assistant(
             "thread_id": thread_id,
             "location": location,
             "nearby_context": nearby_context,
+            "raw_places": raw_places,
             "connected_accounts": {"google": False, "facebook": False, "instagram": False},
         }
     }
