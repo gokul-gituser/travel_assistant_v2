@@ -195,11 +195,16 @@ IMPORTANT RULES:
 
 _PLACES_LIST_RULES = """
 PLACES LIST RULES — FOLLOW EXACTLY:
-- Write ONE short friendly intro sentence (e.g. "Here are the nearest places to you in Seattle:").
+
+If the user has NO specific filters (e.g., they just asked "Find places near me"):
+- Write ONE short friendly intro sentence.
 - Do NOT list, name, or describe any individual place.
-- After your intro sentence, output this token on its own line: <<<PLACES_LIST>>>
-- The complete sorted place list will be inserted automatically after your response.
-- Do not add anything after <<<PLACES_LIST>>>."""
+- Output this exact token on its own line: <<<PLACES_LIST>>>
+
+If the user is FILTERING or REFINING results (e.g., "within x m or km ", "within x meters or kilometers", "cheaper ones", "from that list"):
+- DO NOT use the <<<PLACES_LIST>>> token.
+- Instead, read the PREVIOUS RESULTS or NEARBY PLACES context and manually list the places that match their criteria.
+"""
 
 # ── Param extraction ───────────────────────────────────────────────────────
  
