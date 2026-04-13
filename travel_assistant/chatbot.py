@@ -21,7 +21,9 @@ from langchain.agents.structured_output import ProviderStrategy
 #from prompts import INTENT_CLASSIFIER_PROMPT
 from typing import Optional, List, Literal
 from pydantic import BaseModel
+
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import math
 import requests
@@ -765,9 +767,16 @@ class GraphState(TypedDict):
 
 
 
-def build_time_context() -> TimeContext:
-    """Build time context from current system time"""
-    now = datetime.now()
+def build_time_context(tz_name: str | None = None) -> TimeContext:
+    """Build time context in the user's local timezone."""
+    
+    if tz_name:
+        try:
+            now = datetime.now(tz=ZoneInfo(tz_name))
+        except Exception:
+            now = datetime.now()
+    else:
+        now = datetime.now()
     return {
         "local_time": now.strftime("%H:%M"),
         "day_of_week": now.strftime("%A"),
@@ -795,8 +804,8 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     nearby_context = configurable.get("nearby_context")
 
 
-    #  Time context from system clock
-    time_context = build_time_context()
+    tz_name = configurable.get("timezone")
+    time_context = build_time_context(tz_name)
 
     connected_accounts = configurable.get("connected_accounts", {
         "google": False,
@@ -1895,6 +1904,7 @@ async def run_travel_assistant(
     thread_id: Optional[str] = None,
     nearby_context: Optional[str] = None,
     raw_places: Optional[list] = None,
+    timezone: Optional[str] = None,
 ) -> str:
 
     graph = _get_graph()
@@ -1908,6 +1918,7 @@ async def run_travel_assistant(
             "location": location,
             "nearby_context": nearby_context,
             "raw_places": raw_places,
+            "timezone": timezone,
             "connected_accounts": {"google": False, "facebook": False, "instagram": False},
         }
     }
