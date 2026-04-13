@@ -715,6 +715,7 @@ class LocationContext(TypedDict):
     accuracy_m: Optional[float]
     captured_at: Optional[str]
     city: Optional[str]
+    country_code: Optional[str]
 
 class TimeContext(TypedDict):
     local_time: str
@@ -765,6 +766,57 @@ class GraphState(TypedDict):
     routing: Optional[Dict]
     clarification_attempts: int
 
+EMERGENCY_NUMBERS = {
+    "IN": {"primary": "112", "ambulance": "108"},
+    "US": {"primary": "911"},
+    "UK": {"primary": "999", "secondary": "112", "non_emergency": "111"},
+}
+
+def get_emergency_numbers(country_code: str):
+    return EMERGENCY_NUMBERS.get(country_code, {"primary": "112/911/999"})
+
+def fetch_nearby_healthcare(lat: float, lng: float):
+    query = f"""
+    [out:json][timeout:25];
+    (
+      node(around:2000,{lat},{lng})["amenity"="hospital"];
+      node(around:2000,{lat},{lng})["amenity"="clinic"];
+    );
+    out body 5;
+    """
+    try:
+        resp = requests.post("https://overpass-api.de/api/interpreter", data={"data": query})
+        data = resp.json()
+    except:
+        return []
+
+    places = []
+    for el in data.get("elements", []):
+        name = el.get("tags", {}).get("name")
+        if not name:
+            continue
+        places.append(name)
+
+    return places[:3]
+
+
+def build_urgent_context(state: GraphState, config):
+    location = state.get("location") or {}
+    
+    country_code = location.get("country_code")
+    numbers = get_emergency_numbers(country_code)
+
+    hospitals = []
+    if location:
+        hospitals = fetch_nearby_healthcare(
+            location["lat"], location["lng"]
+        )
+
+    return {
+        "numbers": numbers,
+        "hospitals": hospitals,
+        "location_known": bool(location),
+    }
 
 
 def build_time_context(tz_name: str | None = None) -> TimeContext:
@@ -1694,11 +1746,48 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
 
 
 def handle_urgent(state: GraphState, config: RunnableConfig, *, store: BaseStore):
-    """Health emergency"""
-    state["messages"].append(
-        AIMessage(content="🚨 This sounds serious. Please seek medical help immediately.")
-    )
-    return state
+    ctx = build_urgent_context(state, config)
+
+    numbers = ctx["numbers"]
+    hospitals = ctx["hospitals"]
+
+    # Build deterministic base message (NO LLM hallucination risk)
+    lines = []
+
+    # 1. Immediate statement
+    lines.append("I’m not a doctor, but this may be urgent.")
+
+    # 2. Emergency instruction
+    if ctx["location_known"]:
+        lines.append(f"Call emergency services now: {numbers.get('primary')}.")
+        if numbers.get("ambulance"):
+            lines.append(f"Ambulance: {numbers.get('ambulance')}.")
+    else:
+        lines.append("If you're in immediate danger, call your local emergency number (112/911/999).")
+
+    # 3. Nearby hospitals
+    if hospitals:
+        lines.append("\nNearest options:")
+        for h in hospitals:
+            lines.append(f"- {h}")
+
+    # 4. Minimal triage questions (only if user hasn't acted)
+    lines.append("\nIf you haven’t called yet:")
+    lines.append("Are you having trouble breathing, chest pain, or severe bleeding?")
+    lines.append("Are you alone right now?")
+
+    # 5. Disclaimer
+    lines.append("\nThis is not medical advice.")
+    lines.append("If symptoms are severe or worsening, seek emergency help now.")
+    lines.append("Do not delay care to continue chatting.")
+
+    message = "\n".join(lines)
+
+    return {
+        "messages": [AIMessage(content=message)],
+        "safety_mode": "urgent_health"
+    }
+    
 
 
 def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore):
