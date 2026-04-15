@@ -766,6 +766,9 @@ class GraphState(TypedDict):
     routing: Optional[Dict]
     clarification_attempts: int
 
+    friend_posts: list
+    friend_places_context: Optional[str]
+
 EMERGENCY_NUMBERS = {
     "IN": {"primary": "112", "ambulance": "108"},
     "US": {"primary": "911"},
@@ -844,6 +847,8 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     user_id = configurable.get("user_id")
     user_msg = state["messages"][-1].content
 
+    friend_posts = get_friends_posts(store, user_id)
+
     # . Location from config 
     raw_location = configurable.get("location")
     location = LocationContext(
@@ -917,6 +922,8 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         for h in location_history[-5:]  # last 5 
     ]) or "No location history yet"
 
+    friend_places_context = configurable.get("friend_places_context", "") 
+
     return {
         "location": location,
         "nearby_context": nearby_context,
@@ -928,6 +935,8 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         "safety_mode": "normal",
         "last_results": last_results,
         "location_history_text": location_history_text,
+        "friend_places_context": friend_places_context,
+        "friend_posts": friend_posts
     }
 
 
@@ -1306,23 +1315,7 @@ def collect_itinerary_context(state, config, *, store):
         }
  
  
-def itinerary_collect_decision(state) -> str:
-    """
-    Decide whether to keep asking (if fields are missing) or proceed to enrichment.
-    
-    Returns:
-    - "ask": Stay in collection, ask next question
-    - "enrich": All fields collected, proceed to enrich_itinerary_data
-    """
-    ctx = state.get("itinerary_context", {})
-    
-    # Check if any required field is still missing
-    for field_name in COLLECTION_ORDER:
-        if not ctx.get(field_name):
-            return "ask"
-    
-    # All fields present
-    return "enrich"
+
  
  
 # ── Node 2: enrich_itinerary_data ──────────────────────────────────────────
@@ -1628,40 +1621,87 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
              "last_results": [{"handler": Intent.INTENT_D_FOOD_DIETARY.value, "response": response.content}]} 
 
 
+# def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: BaseStore):
+#     """Friend-based recommendations"""
+#     user_id = config["configurable"].get("user_id")
+#     user_profile_text = get_user_profile_text(store, user_id)
+
+#     travel_history_text = get_travel_history_text(store, user_id)
+
+#     # context for system prompt
+#     location = state.get("location")
+#     nearby = state.get("nearby_context") or ""
+#     time_context = state.get("time_context")
+#     preferences = state.get("preferences")
+#     last_results = state.get("last_results") 
+
+#     friend_places_context = state.get("friend_places_context") or ""
+
+    
+#     context_text = f"""
+#     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+#     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+#     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+#     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
+# """
+
+#     if friend_places_context:
+#             context_text += f"\n{friend_places_context}\n"
+#             context_text += "\nINSTRUCTION: Friend data is available above. Use it to make specific recommendations with attribution (e.g. 'Your friend visited...').\n"
+#         else:
+#             context_text += "\nFRIEND DATA: Not available. No friends have synced places yet, or fb_user_id was not provided.\n"
+
+    
+#     system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
+    
+#     response = llm.invoke([
+#         SystemMessage(content=system_prompt),
+#         *state["messages"]
+#     ])
+#     print("\n===== AI RESPONSE =====")
+#     print(response.content)
+#     print("=======================\n")
+    
+#     return {"messages": [AIMessage(content=response.content)],
+#              "last_results": [{"handler": Intent.INTENT_E_FRIENDS_BASED.value, "response": response.content}]} 
+
 def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: BaseStore):
-    """Friend-based recommendations"""
-    user_id = config["configurable"].get("user_id")
-    user_profile_text = get_user_profile_text(store, user_id)
 
-    travel_history_text = get_travel_history_text(store, user_id)
+    friend_posts = state.get("friend_posts", [])
 
-    # context for system prompt
-    location = state.get("location")
-    nearby = state.get("nearby_context") or ""
-    time_context = state.get("time_context")
-    preferences = state.get("preferences")
-    last_results = state.get("last_results") 
-    
-    context_text = f"""
-    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
-    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
-    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
-    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
-"""
-    
-    system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
-    
+    if not friend_posts:
+        return {
+            "messages": [
+                AIMessage(content="No recent activity found from your friends.")
+            ]
+        }
+
+    # Format posts (keep it simple)
+    lines = ["Your friends recently posted:"]
+
+    for p in friend_posts[:10]:
+        msg = p.get("message") or "(no text)"
+        lines.append(f"- {msg}")
+
+    context_text = "\n".join(lines)
+
+    # Send to LLM
     response = llm.invoke([
-        SystemMessage(content=system_prompt),
-        *state["messages"]
-    ])
-    print("\n===== AI RESPONSE =====")
-    print(response.content)
-    print("=======================\n")
-    
-    return {"messages": [AIMessage(content=response.content)],
-             "last_results": [{"handler": Intent.INTENT_E_FRIENDS_BASED.value, "response": response.content}]} 
+        SystemMessage(content=f"""
+        You are a travel assistant.
 
+        Here is some context from user's friends:
+        {context_text}
+
+        Use it ONLY if relevant to the user's query.
+        """),
+                *state["messages"]
+            ])
+
+    return {
+        "messages": [AIMessage(content=response.content)],
+        "last_results": [{"handler": "friends", "data": friend_posts[:10]}]
+    }
 
 def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Safety & practical travel help"""
@@ -1924,7 +1964,7 @@ def _build_graph():
 
     builder.add_conditional_edges(
         "itinerary_collect",
-        should_proceed_to_enrichment,  # ✅ Correct function
+        should_proceed_to_enrichment,  
         {
             "end": END,                    # ✅ Routes to END when asking
             "enrich": "itinerary_enrich"   # ✅ Routes to enrichment when ready
@@ -1994,6 +2034,7 @@ async def run_travel_assistant(
     nearby_context: Optional[str] = None,
     raw_places: Optional[list] = None,
     timezone: Optional[str] = None,
+    friend_places_context: Optional[str] = None,
 ) -> str:
 
     graph = _get_graph()
@@ -2008,7 +2049,8 @@ async def run_travel_assistant(
             "nearby_context": nearby_context,
             "raw_places": raw_places,
             "timezone": timezone,
-            "connected_accounts": {"google": False, "facebook": False, "instagram": False},
+            "friend_places_context": friend_places_context, 
+            "connected_accounts": {"google": False,"facebook": bool(friend_places_context), "instagram": False},
         }
     }
     final_ai_message = None
