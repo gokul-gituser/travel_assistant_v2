@@ -847,7 +847,6 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     user_id = configurable.get("user_id")
     user_msg = state["messages"][-1].content
 
-    friend_posts = get_friends_posts(store, user_id)
 
     # . Location from config 
     raw_location = configurable.get("location")
