@@ -935,7 +935,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         "last_results": last_results,
         "location_history_text": location_history_text,
         "friend_places_context": friend_places_context,
-        "friend_posts": friend_posts
+        
     }
 
 
