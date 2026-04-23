@@ -755,6 +755,8 @@ class GraphState(TypedDict):
     last_results: Optional[List[Dict]]
     location_history_text: Optional[str]
 
+    friend_places_context: Optional[str] 
+
     previous_intent: Optional[str]
 
     itinerary_context: Optional[Dict]      # destination, num_days, defaults
@@ -844,6 +846,9 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     user_id = configurable.get("user_id")
     user_msg = state["messages"][-1].content
 
+    friend_places_context = configurable.get("friend_places_context", "")  
+
+
     # . Location from config 
     raw_location = configurable.get("location")
     location = LocationContext(
@@ -928,6 +933,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         "safety_mode": "normal",
         "last_results": last_results,
         "location_history_text": location_history_text,
+        "friend_places_context": friend_places_context,
     }
 
 
@@ -1641,6 +1647,12 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
+
+    friend_places_context = state.get("friend_places_context") or ""
+
+    print("\n===== DEBUG handle_friends_based =====")
+    print("friend_places_context:", friend_places_context or "(EMPTY)")
+    print("=======================================\n")
     
     context_text = f"""
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
@@ -1648,8 +1660,17 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 """
+
+    if friend_places_context:
+        context_text += f"\n\n{friend_places_context}\n"
+        context_text += "\nIMPORTANT: Friend activity data is provided above. Use it directly to answer the user's question.\n"
+    else:
+        context_text += "\nFRIEND DATA: No friend activity available yet.\n"
     
-    system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
+    system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(
+        user_profile=user_profile_text,
+        travel_history=travel_history_text,
+        last_results=last_results or "No previous results") + context_text
     
     response = llm.invoke([
         SystemMessage(content=system_prompt),
@@ -1994,7 +2015,11 @@ async def run_travel_assistant(
     nearby_context: Optional[str] = None,
     raw_places: Optional[list] = None,
     timezone: Optional[str] = None,
+    friend_places_context: Optional[str] = None
 ) -> str:
+
+    print(f"DEBUG run_travel_assistant friend_places_context: {friend_places_context or '(EMPTY)'}")
+
 
     graph = _get_graph()
 
