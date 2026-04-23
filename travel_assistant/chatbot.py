@@ -2033,6 +2033,7 @@ async def run_travel_assistant(
             "raw_places": raw_places,
             "timezone": timezone,
             "connected_accounts": {"google": False, "facebook": False, "instagram": False},
+            "friend_places_context": friend_places_context,
         }
     }
     final_ai_message = None
