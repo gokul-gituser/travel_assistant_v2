@@ -846,6 +846,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     user_msg = state["messages"][-1].content
 
     friend_places_context = configurable.get("friend_places_context", "")  
+    print(f"CONTEXT_BUILDER GOT friend_places_context: {repr(friend_places_context)}")
 
 
     # . Location from config 
