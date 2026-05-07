@@ -26,14 +26,21 @@ class Mem0Store:
         query = f"{ns_str}:{key}"
         results = get_mem0().search(
             query,
-            filters={"user_id": user_id},  # ← changed
+            filters={"user_id": user_id},
             limit=1
         )
-        if results and results[0]:
+
+        # Handle both dict format {"results": [...]} and plain list format
+        if isinstance(results, dict):
+            items = results.get("results", [])
+        else:
+            items = results
+
+        if items:
             class _Item:
                 def __init__(self, value):
                     self.value = value
-            return _Item(results[0]["metadata"].get("value"))
+            return _Item(items[0]["metadata"].get("value"))
         return None
 
     def put(self, namespace: tuple, key: str, value):
