@@ -22,6 +22,9 @@ from langchain.agents.structured_output import ProviderStrategy
 from typing import Optional, List, Literal
 from pydantic import BaseModel
 
+from .mem0_store import Mem0Store
+
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -1979,9 +1982,11 @@ def _build_graph():
 
     with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
         checkpointer.setup()
-        with RedisStore.from_conn_string(REDIS_URI) as store:
-            store.setup()
-            graph = builder.compile(checkpointer=checkpointer, store=store)
+        store = Mem0Store()
+        graph = builder.compile(checkpointer=checkpointer, store=store)
+#        with RedisStore.from_conn_string(REDIS_URI) as store:
+#            store.setup()
+#            graph = builder.compile(checkpointer=checkpointer, store=store)
 
         """    mermaid = graph.get_graph().draw_mermaid()
             with open("chatbot_graph_1.mmd", "w", encoding="utf-8") as f:
