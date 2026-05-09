@@ -72,7 +72,7 @@ def _geocode_city(city: str) -> Optional[Dict]:
 #need modification
 def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
     """
-    Fetch tourist-relevant places within 5km of destination centre.
+    Fetch tourist-relevant places within 50km of destination centre.
     Covers attractions, museums, restaurants, cafes, parks.
     """
     query = f"""
@@ -168,7 +168,11 @@ def _format_places_for_llm(places: List[Dict]) -> str:
  
 
 
-llm = ChatOpenAI(model="gpt-4o-mini")
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0,
+    model_kwargs={"max_completion_tokens": 2000}  # ← Use correct param
+)
 
 
 class UserProfile(BaseModel):
