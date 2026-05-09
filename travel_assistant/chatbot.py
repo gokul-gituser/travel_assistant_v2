@@ -72,20 +72,20 @@ def _geocode_city(city: str) -> Optional[Dict]:
 #need modification
 def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
     """
-    Fetch tourist-relevant places within 50km of destination centre.
+    Fetch tourist-relevant places within 10km of destination centre.
     Covers attractions, museums, restaurants, cafes, parks.
     """
     query = f"""
-    [out:json][timeout:30];
+    [out:json][timeout:60];
     (
-      node(around:5000,{lat},{lng})["tourism"="attraction"];
-      node(around:5000,{lat},{lng})["tourism"="museum"];
-      node(around:5000,{lat},{lng})["amenity"="restaurant"];
-      node(around:5000,{lat},{lng})["amenity"="cafe"];
-      node(around:5000,{lat},{lng})["leisure"="park"];
-      way(around:5000,{lat},{lng})["tourism"="attraction"];
-      way(around:5000,{lat},{lng})["tourism"="museum"];
-      way(around:5000,{lat},{lng})["leisure"="park"];
+      node(around:10000,{lat},{lng})["tourism"="attraction"];
+      node(around:10000,{lat},{lng})["tourism"="museum"];
+      node(around:10000,{lat},{lng})["amenity"="restaurant"];
+      node(around:10000,{lat},{lng})["amenity"="cafe"];
+      node(around:10000,{lat},{lng})["leisure"="park"];
+      way(around:10000,{lat},{lng})["tourism"="attraction"];
+      way(around:10000,{lat},{lng})["tourism"="museum"];
+      way(around:10000,{lat},{lng})["leisure"="park"];
     );
     out center 60;
     """
@@ -93,7 +93,7 @@ def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
         resp = requests.post(
             "https://overpass-api.de/api/interpreter",
             data={"data": query},
-            timeout=35,
+            timeout=70,
         )
         if resp.status_code != 200:
             return []
