@@ -32,8 +32,21 @@ class Mem0Store:
         ns_str  = "_".join(str(n) for n in namespace)
 
         all_results = get_mem0().get_all(filters={"user_id": user_id})
-        items = all_results if isinstance(all_results, list) else all_results.get("results", [])
 
+        # — print the raw result shape
+        print(f"🔍 GET raw type: {type(all_results)}")
+        if isinstance(all_results, dict):
+            print(f"🔍 GET dict keys: {all_results.keys()}")
+            items = all_results.get("results", [])
+        else:
+            items = all_results or []
+        
+        print(f"🔍 GET items count: {len(items)}")
+        if items:
+            print(f"🔍 GET first item keys: {list(items[0].keys())}")
+            print(f"🔍 GET first item: {items[0]}")
+
+            
         for item in items:
             # namespace/key are TOP LEVEL in the result, not nested under "metadata"
             if item.get("namespace") == ns_str and item.get("key") == key:
