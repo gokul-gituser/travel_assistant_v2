@@ -8,6 +8,12 @@ config = {
             "host": "localhost",
             "port": 6333,
         }
+    }, 
+    "llm": {
+        "provider": "openai",
+        "config": {
+            "model": "gpt-4o-mini",   # force a model that accepts max_tokens
+        }
     }
 }
 
