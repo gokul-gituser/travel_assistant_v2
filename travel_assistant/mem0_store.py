@@ -42,10 +42,17 @@ class Mem0Store:
 
     def put(self, namespace: tuple, key: str, value):
         user_id = namespace[-1]
-        ns_str = "_".join(namespace)
+        ns_str  = "_".join(str(n) for n in namespace)
         content = f"{ns_str}:{key} = {value}"
-        get_mem0().add(
-            content,
-            user_id=user_id,  # ← add() still uses user_id directly
-            metadata={"namespace": ns_str, "key": key, "value": value}
-        )
+        
+        print(f"🟡 mem0 PUT called — user_id={user_id}, ns={ns_str}, key={key}")
+        
+        try:
+            get_mem0().add(
+                content,
+                user_id=user_id,
+                metadata={"namespace": ns_str, "key": key, "value": value}
+            )
+            print(f"✅ mem0 PUT success — user_id={user_id}, key={key}")
+        except Exception as e:
+            print(f"❌ mem0 PUT failed — {e}")
