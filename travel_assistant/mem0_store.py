@@ -44,7 +44,7 @@ class Mem0Store:
 
         return None
 
-   def put(self, namespace: tuple, key: str, value):
+    def put(self, namespace: tuple, key: str, value):
         user_id = namespace[-1]
         ns_str  = "_".join(str(n) for n in namespace)
         content = f"{ns_str}:{key} = {value}"
