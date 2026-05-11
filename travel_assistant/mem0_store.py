@@ -32,27 +32,24 @@ class Mem0Store:
         ns_str  = "_".join(str(n) for n in namespace)
 
         all_results = get_mem0().get_all(filters={"user_id": user_id})
-
-        # mem0 returns either a list or {"results": [...]}
         items = all_results if isinstance(all_results, list) else all_results.get("results", [])
 
         for item in items:
-            meta = item.get("metadata", {})
-            if meta.get("namespace") == ns_str and meta.get("key") == key:
+            # namespace/key are TOP LEVEL in the result, not nested under "metadata"
+            if item.get("namespace") == ns_str and item.get("key") == key:
                 class _Item:
                     def __init__(self, value):
                         self.value = value
-                return _Item(meta.get("value"))
+                return _Item(item.get("value"))
 
         return None
 
-    def put(self, namespace: tuple, key: str, value):
+   def put(self, namespace: tuple, key: str, value):
         user_id = namespace[-1]
         ns_str  = "_".join(str(n) for n in namespace)
         content = f"{ns_str}:{key} = {value}"
-        
+
         print(f"🟡 mem0 PUT called — user_id={user_id}, ns={ns_str}, key={key}")
-        
         try:
             get_mem0().add(
                 content,
