@@ -20,27 +20,24 @@ def get_mem0():
     return _mem0
 
 class Mem0Store:
+    
     def get(self, namespace: tuple, key: str):
         user_id = namespace[-1]
-        ns_str = "_".join(namespace)
-        query = f"{ns_str}:{key}"
-        results = get_mem0().search(
-            query,
-            filters={"user_id": user_id},
-            limit=1
-        )
+        ns_str  = "_".join(str(n) for n in namespace)
 
-        # Handle both dict format {"results": [...]} and plain list format
-        if isinstance(results, dict):
-            items = results.get("results", [])
-        else:
-            items = results
+        all_results = get_mem0().get_all(filters={"user_id": user_id})
 
-        if items:
-            class _Item:
-                def __init__(self, value):
-                    self.value = value
-            return _Item(items[0]["metadata"].get("value"))
+        # mem0 returns either a list or {"results": [...]}
+        items = all_results if isinstance(all_results, list) else all_results.get("results", [])
+
+        for item in items:
+            meta = item.get("metadata", {})
+            if meta.get("namespace") == ns_str and meta.get("key") == key:
+                class _Item:
+                    def __init__(self, value):
+                        self.value = value
+                return _Item(meta.get("value"))
+
         return None
 
     def put(self, namespace: tuple, key: str, value):
