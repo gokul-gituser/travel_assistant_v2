@@ -17,3 +17,12 @@ config = {
 @lru_cache(maxsize=1)
 def get_mem0() -> Memory:
     return Memory.from_config(CONFIG)
+
+
+class Mem0Store:
+    """
+    Temporary compatibility wrapper.
+    Existing chatbot imports still expect this class.
+    """
+
+    pass
