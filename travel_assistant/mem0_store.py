@@ -3,7 +3,7 @@ from mem0 import Memory
 from functools import lru_cache
 
 
-config = {
+CONFIG = {
     "vector_store": {
         "provider": "qdrant",
         "config": {"host": "localhost", "port": 6333}
