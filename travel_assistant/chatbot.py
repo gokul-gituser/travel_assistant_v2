@@ -1986,11 +1986,11 @@ def _build_graph():
 
     with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
         checkpointer.setup()
-        store = Mem0Store()
+        #store = Mem0Store()
         graph = builder.compile(checkpointer=checkpointer, store=store)
-#        with RedisStore.from_conn_string(REDIS_URI) as store:
-#            store.setup()
-#            graph = builder.compile(checkpointer=checkpointer, store=store)
+        with RedisStore.from_conn_string(REDIS_URI) as store:
+            store.setup()
+            graph = builder.compile(checkpointer=checkpointer, store=store)
 
         """    mermaid = graph.get_graph().draw_mermaid()
             with open("chatbot_graph_1.mmd", "w", encoding="utf-8") as f:
