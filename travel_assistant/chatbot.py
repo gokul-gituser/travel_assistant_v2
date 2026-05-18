@@ -1987,7 +1987,7 @@ def _build_graph():
     with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
         checkpointer.setup()
         #store = Mem0Store()
-        graph = builder.compile(checkpointer=checkpointer, store=store)
+        #graph = builder.compile(checkpointer=checkpointer, store=store)
         with RedisStore.from_conn_string(REDIS_URI) as store:
             store.setup()
             graph = builder.compile(checkpointer=checkpointer, store=store)
