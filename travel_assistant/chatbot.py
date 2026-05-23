@@ -23,6 +23,7 @@ from typing import Optional, List, Literal
 from pydantic import BaseModel
 
 from .mem0_store import Mem0Store
+from .retriever import retrieve_context
 
 
 from datetime import datetime
@@ -303,6 +304,12 @@ If the user asks for:
 Use the previous results to avoid repeating recommendations and refine the suggestions using the nearby places list.
 PREVIOUS RESULTS
 {{last_results}}
+
+Relevant personal memories:
+{{personal_memories}}
+
+Relevant conversation memories:
+{{conversation_memories}}
 
 Never fabricate places or distances.
 Only use the data provided in the context.""".format(places_list_rules=_PLACES_LIST_RULES)
@@ -774,6 +781,8 @@ class GraphState(TypedDict):
     itinerary_places:  Optional[List[Dict]] # real places from Overpass
     itinerary_messages: Annotated[List[BaseMessage], add_messages]
 
+    retrieved_context: Optional[Dict]
+
     # Intent routing
     classification: Optional[Dict]
     routing: Optional[Dict]
@@ -856,6 +865,15 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     configurable = config.get("configurable", {})
     user_id = configurable.get("user_id")
     user_msg = state["messages"][-1].content
+
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+    )
+
+    print("\n===== RETRIEVED CONTEXT =====")
+    print(retrieved_context)
+    print("================================\n")
 
     friend_places_context = configurable.get("friend_places_context", "")  
     print(f"CONTEXT_BUILDER GOT friend_places_context: {repr(friend_places_context)}")
@@ -946,6 +964,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         "last_results": last_results,
         "location_history_text": location_history_text,
         "friend_places_context": friend_places_context,
+        "retrieved_context": retrieved_context,
     }
 
 
@@ -1444,14 +1463,31 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
 
     location_history_text = state.get("location_history_text", "No location history yet")
 
-    
-#    
+    retrieved_context = state.get(
+        "retrieved_context",
+        {},
+    )
+
+    personal_memories = retrieved_context.get(
+        "personal_memories",
+        [],
+    )
+
+    conversation_memories = retrieved_context.get(
+        "conversation_memories",
+        [],
+    )
+   
     
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
     location_context=location_context
     ,last_results=last_results or "No previous results",
     location_history=location_history_text
-    ,nearby_places=nearby if nearby else "NOT AVAILABLE")
+    ,nearby_places=nearby if nearby else "NOT AVAILABLE",
+    personal_memories="\n".join(personal_memories) or "None",
+
+    conversation_memories="\n".join(conversation_memories) or "None",
+    )
     
     response = llm.invoke([
         SystemMessage(content=system_prompt),

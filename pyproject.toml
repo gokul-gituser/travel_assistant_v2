@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "faiss-cpu>=1.13.2",
     "fakeredis>=2.34.1",
     "fastapi>=0.131.0",
     "freezegun>=1.5.5",

@@ -1,7 +1,8 @@
 
 from typing import Dict, List
 
-from travel_assistant.mem0_store import get_mem0
+from mem0_store import get_mem0
+from faiss_store import search_documents
 
 
 def search_user_memory(
@@ -18,8 +19,10 @@ def search_user_memory(
     try:
         results = m.search(
             query=query,
-            user_id=user_id,
             limit=limit,
+            filters={
+                "user_id": user_id,
+            }
         )
 
         items = (
@@ -43,8 +46,8 @@ def search_user_memory(
         return []
 
 
-# Future FAISS retrieval layer
-# Boss's upcoming task plugs in here
+#FAISS retrieval layer
+
 
 def search_conversations(
     user_id: str,
@@ -52,10 +55,25 @@ def search_conversations(
     limit: int = 5,
 ) -> List[str]:
 
-    return []
+    try:
 
+        results = search_documents(
+            query=query,
+            top_k=limit,
+            filters={
+                "username": user_id,
+            }
+        )
 
-# Unified retrieval interface
+        return [
+            item["text"]
+            for item in results
+        ]
+
+    except Exception as e:
+        print(f"[FAISS SEARCH ERROR] {e}")
+        return []
+
 
 def retrieve_context(
     user_id: str,
@@ -68,6 +86,7 @@ def retrieve_context(
             query=query,
             limit=5,
         ),
+
         "conversation_memories": search_conversations(
             user_id=user_id,
             query=query,
