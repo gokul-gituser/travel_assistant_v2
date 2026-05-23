@@ -1,8 +1,8 @@
 
 from typing import Dict, List
 
-from mem0_store import get_mem0
-from faiss_store import search_documents
+from .mem0_store import get_mem0
+from .faiss_store import search_documents
 
 
 def search_user_memory(
