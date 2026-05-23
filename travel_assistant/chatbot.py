@@ -1481,7 +1481,7 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
     location_context=location_context
-    ,last_results="" or "No previous results",
+    ,last_results=last_results or "No previous results",
     location_history=location_history_text
     ,nearby_places=nearby if nearby else "NOT AVAILABLE",
     personal_memories="\n".join(personal_memories) or "None",
