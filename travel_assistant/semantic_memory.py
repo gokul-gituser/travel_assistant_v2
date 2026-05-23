@@ -1,4 +1,4 @@
-from travel_assistant.mem0_store import get_mem0
+from .mem0_store import get_mem0
 
 
 def add_semantic_memory(

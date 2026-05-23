@@ -1,4 +1,4 @@
-from faiss_store import add_documents
+from .faiss_store import add_documents
 
 
 def chat_interaction(
