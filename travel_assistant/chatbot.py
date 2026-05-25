@@ -507,6 +507,11 @@ If the user's location IS available but no nearby places list is provided:
 If BOTH location AND nearby places are provided:
 {places_list_rules}
 
+Relevant personal memories:
+{{personal_memories}}
+
+Relevant conversation memories:
+{{conversation_memories}}
 
 User Profile:
 {{user_profile}}
@@ -1484,8 +1489,8 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     ,last_results=last_results or "No previous results",
     location_history=location_history_text
     ,nearby_places=nearby if nearby else "NOT AVAILABLE",
-    personal_memories="\n".join(personal_memories) or "None",
 
+    personal_memories="\n".join(personal_memories) or "None",
     conversation_memories="\n".join(conversation_memories) or "None",
     )
     
@@ -1788,6 +1793,11 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
 
     location_history_text = state.get("location_history_text", "No location history yet")
 
+       # ── FAISS retrieved context ──────────────────────────────────────────
+    retrieved_context = state.get("retrieved_context", {})
+    personal_memories = retrieved_context.get("personal_memories", [])
+    conversation_memories = retrieved_context.get("conversation_memories", [])
+    # ────────────────────────────────────────────────────────────────────
     
 #     context_text = f"""
 #     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
@@ -1801,7 +1811,10 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
             last_results=last_results or "No previous results",
             location_context=location_context,           
             location_history=location_history_text,
-            nearby_places=nearby if nearby else "NOT AVAILABLE",  
+            nearby_places=nearby if nearby else "NOT AVAILABLE", 
+
+            personal_memories="\n".join(personal_memories) or "None",       
+            conversation_memories="\n".join(conversation_memories) or "None", 
         )    
     response = llm.invoke([
         SystemMessage(content=system_prompt),

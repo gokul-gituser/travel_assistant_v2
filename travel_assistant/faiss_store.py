@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 import json
 from .chunking import chunk_text
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 dimension = 1536
@@ -20,27 +23,44 @@ metadata_store = []
 INDEX_FILE = "faiss_index.bin"
 METADATA_FILE = "faiss_metadata.json"
 
-def get_embedding(text: str):
+def get_embedding(text: str,retries: int = 3):
+    for attempt in range(retries):
+        try:
+            t0 = time.perf_counter()
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=text,
+            )
+            logger.debug("get_embedding: %.3fs", time.perf_counter() - t0)
+            return response.data[0].embedding
+        except Exception as e:
+            if attempt == retries - 1:
+                logger.error("get_embedding failed after %d attempts: %s | text=%.80s", retries, e, text)
+                raise
+            logger.warning("[EMBEDDING RETRY %d] %s", attempt + 1, e)
+            time.sleep(2 ** attempt)  # 1s, 2s, 4s
 
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=text,
-    )
 
-    return response.data[0].embedding
+def get_embeddings(texts: list[str], retries: int = 3):
+    for attempt in range(retries):
+        try:
+            t0 = time.perf_counter()
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=texts,
+            )
+            logger.debug("get_embeddings: %d texts in %.3fs", len(texts), time.perf_counter() - t0)
 
-
-def get_embeddings(texts: list[str]):
-
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=texts,
-    )
-
-    return [
-        item.embedding
-        for item in response.data
-    ]
+            return [
+                item.embedding
+                for item in response.data
+            ]
+        except Exception as e:
+            if attempt == retries - 1:
+                logger.error("get_embeddings failed after %d attempts: %s | first_text=%.80s", retries, e, texts[0] if texts else "")
+                raise
+            logger.warning("[EMBEDDING RETRY %d] %s", attempt + 1, e)
+            time.sleep(2 ** attempt)  # 1s, 2s, 4s
 
 
 def add_document(
@@ -72,6 +92,8 @@ def add_document(
 
         metadata_store.append(chunk_metadata)
 
+    logger.info("add_document: %d chunk(s) added | total in index: %d", len(chunks), index.ntotal)
+
 
 def add_documents(
     texts: list[str],
@@ -79,6 +101,8 @@ def add_documents(
 ):
 
     if not texts:
+        logger.warning("add_documents called with empty texts — skipping")
+
         return
 
     if metadatas is None:
@@ -104,6 +128,7 @@ def add_documents(
                 "chunk_id": chunk_index,
             })
 
+    t0 = time.perf_counter()
     vectors = get_embeddings(all_chunks)
 
     arr = np.array(vectors, dtype="float32")
@@ -114,6 +139,11 @@ def add_documents(
 
     metadata_store.extend(all_metadata)
 
+    logger.info(
+        "add_documents: %d text(s) → %d chunk(s) | embed=%.3fs | total in index: %d",
+        len(texts), len(all_chunks), embed_latency, index.ntotal,
+    )
+
 
 def search_documents(
     query: str,
@@ -123,6 +153,11 @@ def search_documents(
 
 ):
 
+    if not documents:
+            logger.warning("search_documents called but index is empty")
+            return []
+ 
+    t0 = time.perf_counter()
     vector = get_embedding(query)
 
     arr = np.array([vector], dtype="float32")
@@ -165,7 +200,11 @@ def search_documents(
         if score_threshold is not None:
 
             if score > score_threshold:
+                logger.debug("Chunk idx=%d score=%.4f exceeded threshold=%.4f — skipped", idx, score, score_threshold)
                 continue
+        
+        logger.debug("FAISS match | score=%.4f | text=%.80s", score, documents[idx])
+
 
         print("\n===== FAISS MATCH =====")
         print("QUERY:", query)
@@ -181,11 +220,18 @@ def search_documents(
         })
 
         seen.add(idx)
+    
+    logger.info(
+        "search_documents: query=%.60s | top_k=%d | returned=%d | latency=%.3fs",
+        query, top_k, len(results), time.perf_counter() - t0,
+    )
 
     return results
 
 
 def save_index():
+     t0 = time.perf_counter()
+
 
     faiss.write_index(index, INDEX_FILE)
 
@@ -202,6 +248,8 @@ def save_index():
 
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
+    logger.info("save_index: %d documents saved in %.3fs", len(documents), time.perf_counter() - t0)
+
     print("✅ FAISS index saved")
 
 
@@ -212,12 +260,17 @@ def load_index():
     global metadata_store
 
     if not os.path.exists(INDEX_FILE):
+        logger.warning("load_index: no index file found at '%s' — starting fresh", INDEX_FILE)
+
         print("⚠️ No FAISS index file found")
         return
 
     if not os.path.exists(METADATA_FILE):
+        logger.warning("load_index: no metadata file found at '%s' — starting fresh", METADATA_FILE)
         print("⚠️ No metadata file found")
         return
+
+    t0 = time.perf_counter()
 
     index = faiss.read_index(INDEX_FILE)
 
@@ -231,5 +284,17 @@ def load_index():
         item["metadata"]
         for item in payload
     ]
+
+    # Validate index integrity
+    if index.ntotal != len(documents):
+        logger.error(
+            "load_index: integrity check FAILED — vectors=%d documents=%d",
+            index.ntotal, len(documents),
+        )
+    else:
+        logger.info(
+            "load_index: %d documents loaded in %.3fs | integrity OK",
+            len(documents), time.perf_counter() - t0,
+        )
 
     print(f"✅ Loaded {len(documents)} documents")

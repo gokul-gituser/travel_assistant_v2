@@ -1,4 +1,4 @@
-from .faiss_store import add_documents
+from .faiss_store import add_documents, save_index  
 
 
 def chat_interaction(
@@ -7,28 +7,25 @@ def chat_interaction(
     assistant_reply: str,
 ):
 
-    texts = [
-        user_message,
-        assistant_reply,
-    ]
-
+    now = datetime.now(timezone.utc)
+    base_meta = {
+        "username": user_id,
+        "source": "chat",
+        "year": now.year,
+        "month": now.month,
+        "day": now.day,
+    }
+    texts = [user_message, assistant_reply]
     metadatas = [
-        {
-            "username": user_id,
-            "type": "user_message",
-            "source": "chat",
-        },
-        {
-            "username": user_id,
-            "type": "assistant_reply",
-            "source": "chat",
-        }
+        {**base_meta, "type": "user_message"},
+        {**base_meta, "type": "assistant_reply"},
     ]
 
     add_documents(
         texts=texts,
         metadatas=metadatas,
     )
+    save_index()
 
     print("\n=== SAVING CHAT TO FAISS ===")
     print("USER:", user_message)

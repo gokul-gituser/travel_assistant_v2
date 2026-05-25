@@ -4,6 +4,7 @@ from typing import Dict, List
 from .mem0_store import get_mem0
 from .faiss_store import search_documents
 
+logger = logging.getLogger(__name__)
 
 def search_user_memory(
     user_id: str,
@@ -12,6 +13,8 @@ def search_user_memory(
 ) -> List[str]:
 
     if not user_id:
+        logger.warning("search_user_memory called with empty user_id — skipping")
+
         return []
 
     m = get_mem0()
@@ -24,6 +27,8 @@ def search_user_memory(
                 "user_id": user_id,
             }
         )
+        latency = time.perf_counter() - t0
+
 
         items = (
             results
