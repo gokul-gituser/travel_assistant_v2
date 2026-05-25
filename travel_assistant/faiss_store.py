@@ -167,6 +167,13 @@ def search_documents(
             if score > score_threshold:
                 continue
 
+        print("\n===== FAISS MATCH =====")
+        print("QUERY:", query)
+        print("TEXT:", documents[idx])
+        print("METADATA:", metadata)
+        print("SCORE:", score)
+        print("=======================\n")
+
         results.append({
             "text": documents[idx],
             "metadata": metadata,

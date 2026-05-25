@@ -80,16 +80,25 @@ def retrieve_context(
     query: str,
 ) -> Dict[str, List[str]]:
 
-    return {
-        "personal_memories": search_user_memory(
-            user_id=user_id,
-            query=query,
-            limit=5,
-        ),
+    personal_memories = search_user_memory(
+        user_id=user_id,
+        query=query,
+        limit=5,
+    )
 
-        "conversation_memories": search_conversations(
-            user_id=user_id,
-            query=query,
-            limit=5,
-        ),
+    conversation_memories = search_conversations(
+        user_id=user_id,
+        query=query,
+        limit=5,
+    )
+
+    context = {
+        "personal_memories": personal_memories,
+        "conversation_memories": conversation_memories,
     }
+
+    print("\n===== RETRIEVED CONTEXT =====")
+    print(context)
+    print("================================\n")
+
+    return context
