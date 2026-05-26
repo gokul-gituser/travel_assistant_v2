@@ -339,6 +339,19 @@ IMPORTANT: You will be provided with the user's exact current location (coordina
 User Profile:
 {{user_profile}}
 
+MEMORY RULES:
+- Use retrieved conversation memories only if relevant to the current itinerary.
+- Prefer recent travel-related memories over unrelated chats.
+- Do not invent itinerary details not present in retrieved context.
+- Use previous preferences to personalize recommendations.
+- If memories conflict, prioritize the newest information.
+
+Relevant personal memories:
+{{personal_memories}}
+
+Relevant conversation memories:
+{{conversation_memories}}
+
 If the user says things that could include checking previous results like "show me cheaper ones", "more options", "something different" — 
 use the previous results provided to refine your response accordingly.
 Previous Results:
@@ -357,6 +370,19 @@ You specialize in finding restaurants with dietary considerations.
 
 User Profile:
 {{user_profile}}
+
+MEMORY RULES:
+- Use retrieved conversation memories only if relevant to the current itinerary.
+- Prefer recent travel-related memories over unrelated chats.
+- Do not invent itinerary details not present in retrieved context.
+- Use previous preferences to personalize recommendations.
+- If memories conflict, prioritize the newest information.
+
+Relevant personal memories:
+{{personal_memories}}
+
+Relevant conversation memories:
+{{conversation_memories}}
 
 IMPORTANT: You will be provided with the user's exact current location (coordinates and city) and a list of real nearby places already fetched for you. 
 - NEVER ask the user for their location — it is already provided below in the context.
@@ -406,6 +432,19 @@ RULES:
 ━━━ CONTEXT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 User profile:
 {user_profile}
+
+MEMORY RULES:
+- Use retrieved conversation memories only if relevant to the current itinerary.
+- Prefer recent travel-related memories over unrelated chats.
+- Do not invent itinerary details not present in retrieved context.
+- Use previous preferences to personalize recommendations.
+- If memories conflict, prioritize the newest information.
+
+Relevant personal memories:
+{{personal_memories}}
+
+Relevant conversation memories:
+{{conversation_memories}}
  
 Trip parameters:
   Destination:      {destination}
@@ -447,6 +486,19 @@ If no friend data exists:
 User Profile:
 {user_profile}
 
+MEMORY RULES:
+- Use retrieved conversation memories only if relevant to the current itinerary.
+- Prefer recent travel-related memories over unrelated chats.
+- Do not invent itinerary details not present in retrieved context.
+- Use previous preferences to personalize recommendations.
+- If memories conflict, prioritize the newest information.
+
+Relevant personal memories:
+{personal_memories}
+
+Relevant conversation memories:
+{conversation_memories}
+
 If the user says things that could include checking previous results like "show me cheaper ones", "more options", "something different" — 
 use the previous results provided to refine your response accordingly.
 Previous Results:
@@ -463,6 +515,19 @@ You provide practical safety information and local travel tips.
 
 User Profile:
 {user_profile}
+
+MEMORY RULES:
+- Use retrieved conversation memories only if relevant to the current itinerary.
+- Prefer recent travel-related memories over unrelated chats.
+- Do not invent itinerary details not present in retrieved context.
+- Use previous preferences to personalize recommendations.
+- If memories conflict, prioritize the newest information.
+
+Relevant personal memories:
+{personal_memories}
+
+Relevant conversation memories:
+{conversation_memories}
 
 If the user says things that could include checking previous results like "show me cheaper ones", "more options", "something different" — 
 use the previous results provided to refine your response accordingly.
@@ -1545,6 +1610,21 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
         if location else "NOT AVAILABLE"
     )
 
+    retrieved_context = state.get(
+        "retrieved_context",
+        {},
+    )
+
+    personal_memories = retrieved_context.get(
+        "personal_memories",
+        [],
+    )
+
+    conversation_memories = retrieved_context.get(
+        "conversation_memories",
+        [],
+    )
+
     location_history_text = state.get("location_history_text", "No location history yet")
 
 
@@ -1556,13 +1636,19 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
 #     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
 #     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 # """
+    personal_str, conversation_str = format_retrieved_context(
+        personal_memories,
+        conversation_memories,
+    )
     
     system_prompt = SYSTEM_PROMPT_NEARBY_BY_NEED.format(
         user_profile=user_profile_text,
         nearby_places=nearby if nearby else "NOT AVAILABLE",
         location_context=location_context,
         location_history=location_history_text,
-        last_results=last_results or "No previous results")
+        last_results=last_results or "No previous results",
+        personal_memories=personal_str,
+        conversation_memories=conversation_str,)
     
     response = llm.invoke([
         SystemMessage(content=system_prompt),
@@ -1590,6 +1676,27 @@ def handle_itinerary(state, config, *, store):
     travel_history_text = get_travel_history_text(store, user_id)
  
     ctx          = state.get("itinerary_context") or {}
+
+    retrieved_context = state.get(
+        "retrieved_context",
+        {},
+    )
+
+    personal_memories = retrieved_context.get(
+        "personal_memories",
+        [],
+    )
+
+    conversation_memories = retrieved_context.get(
+        "conversation_memories",
+        [],
+    )
+
+    personal_str, conversation_str = format_retrieved_context(
+        personal_memories,
+        conversation_memories,
+    )
+
     itinerary_messages = state.get("itinerary_messages") or []  # ← Load history
     
     raw_places   = state.get("itinerary_places") or []
@@ -1622,6 +1729,8 @@ def handle_itinerary(state, config, *, store):
         travel_history = travel_history_text,
         last_results   = last_results or "No previous results",
         places_block   = places_block,
+        personal_memories=personal_str,
+        conversation_memories=conversation_str,
     )
 
     # Add conversation context to prompt
@@ -1674,6 +1783,21 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
+
+    retrieved_context = state.get(
+        "retrieved_context",
+        {},
+    )
+
+    personal_memories = retrieved_context.get(
+        "personal_memories",
+        [],
+    )
+
+    conversation_memories = retrieved_context.get(
+        "conversation_memories",
+        [],
+    )
     
     location_context = (
         f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
@@ -1686,12 +1810,15 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
 #     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
 #     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 # """
-    
+    personal_str, conversation_str = format_retrieved_context(personal_memories, conversation_memories)
+
     system_prompt = SYSTEM_PROMPT_FOOD.format(
             user_profile=user_profile_text,
             last_results=last_results or "No previous results",
             location_context=location_context,           
             nearby_places=nearby if nearby else "NOT AVAILABLE", 
+            personal_memories=personal_str,
+            conversation_memories=conversation_str,
         )    
     response = llm.invoke([
         SystemMessage(content=system_prompt),
@@ -1724,6 +1851,21 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
     print("\n===== DEBUG handle_friends_based =====")
     print("friend_places_context:", friend_places_context or "(EMPTY)")
     print("=======================================\n")
+
+    retrieved_context = state.get(
+        "retrieved_context",
+        {},
+    )
+
+    personal_memories = retrieved_context.get(
+        "personal_memories",
+        [],
+    )
+
+    conversation_memories = retrieved_context.get(
+        "conversation_memories",
+        [],
+    )
     
     context_text = f"""
     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
@@ -1738,9 +1880,13 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
     else:
         context_text += "\nFRIEND DATA: No friend activity available yet.\n"
     
+    personal_str, conversation_str = format_retrieved_context(personal_memories, conversation_memories)
+
     system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(
         user_profile=user_profile_text,
         travel_history=travel_history_text,
+        personal_memories=personal_str,
+        conversation_memories=conversation_str,
         last_results=last_results or "No previous results") + context_text
     
     response = llm.invoke([
@@ -1774,9 +1920,27 @@ def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store:
     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
     User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
+
 """
-    
-    system_prompt = SYSTEM_PROMPT_SAFETY.format(user_profile=user_profile_text,travel_history=travel_history_text,last_results=last_results or "No previous results") + context_text
+    retrieved_context = state.get(
+        "retrieved_context",
+        {},
+    )
+
+    personal_memories = retrieved_context.get(
+        "personal_memories",
+        [],
+    )
+
+    conversation_memories = retrieved_context.get(
+        "conversation_memories",
+        [],
+    )
+
+    personal_str, conversation_str = format_retrieved_context(personal_memories, conversation_memories)
+
+    system_prompt = SYSTEM_PROMPT_SAFETY.format(user_profile=user_profile_text,travel_history=travel_history_text,personal_memories=personal_str,
+        conversation_memories=conversation_str,last_results=last_results or "No previous results") + context_text
     
     response = llm.invoke([
         SystemMessage(content=system_prompt),
