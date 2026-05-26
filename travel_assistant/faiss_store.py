@@ -132,6 +132,8 @@ def add_documents(
 
     t0 = time.perf_counter()
     vectors = get_embeddings(all_chunks)
+    embed_latency = time.perf_counter() - t0
+
 
     arr = np.array(vectors, dtype="float32")
 
