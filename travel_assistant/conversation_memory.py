@@ -1,5 +1,6 @@
 from .faiss_store import add_documents, save_index  
-
+from datetime import datetime, timezone
+import uuid
 
 def chat_interaction(
     user_id: str,
@@ -14,6 +15,8 @@ def chat_interaction(
         "year": now.year,
         "month": now.month,
         "day": now.day,
+        "conversation_id": str(uuid.uuid4()),       # ← ties user_message + assistant_reply together
+        "timestamp": now.isoformat(),               # ← exact time for traceability
     }
     texts = [user_message, assistant_reply]
     metadatas = [

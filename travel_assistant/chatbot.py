@@ -22,6 +22,7 @@ from langchain.agents.structured_output import ProviderStrategy
 from typing import Optional, List, Literal
 from pydantic import BaseModel
 
+from .format_retrieved_context import format_retrieved_context
 from .mem0_store import Mem0Store
 from .retriever import retrieve_context
 
@@ -305,6 +306,13 @@ Use the previous results to avoid repeating recommendations and refine the sugge
 PREVIOUS RESULTS
 {{last_results}}
 
+MEMORY RULES
+The following memories are retrieved from past conversations with this user.
+- Use them ONLY if they are directly relevant to the current request.
+- Do NOT mention or reference them unless they genuinely help answer the question.
+- If both sections say "None", ignore this section entirely and respond based on the current context only.
+- Never invent or assume facts not present in the data below.
+
 Relevant personal memories:
 {{personal_memories}}
 
@@ -506,6 +514,13 @@ If the user's location IS available but no nearby places list is provided:
 
 If BOTH location AND nearby places are provided:
 {places_list_rules}
+
+MEMORY RULES
+The following memories are retrieved from past conversations with this user.
+- Use them ONLY if they are directly relevant to the current request.
+- Do NOT mention or reference them unless they genuinely help answer the question.
+- If both sections say "None", ignore this section entirely and respond based on the current context only.
+- Never invent or assume facts not present in the data below.
 
 Relevant personal memories:
 {{personal_memories}}
@@ -1482,6 +1497,9 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
         "conversation_memories",
         [],
     )
+
+    # format  retrieved context
+    personal_str, conversation_str = format_retrieved_context(personal_memories, conversation_memories)
    
     
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
@@ -1490,8 +1508,8 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     location_history=location_history_text
     ,nearby_places=nearby if nearby else "NOT AVAILABLE",
 
-    personal_memories="\n".join(personal_memories) or "None",
-    conversation_memories="\n".join(conversation_memories) or "None",
+    personal_memories=personal_str,
+    conversation_memories=conversation_str
     )
     
     response = llm.invoke([
@@ -1799,6 +1817,8 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
     conversation_memories = retrieved_context.get("conversation_memories", [])
     # ────────────────────────────────────────────────────────────────────
     
+    personal_str, conversation_str = format_retrieved_context(personal_memories, conversation_memories)
+
 #     context_text = f"""
 #     Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
 #     Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
@@ -1813,8 +1833,9 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
             location_history=location_history_text,
             nearby_places=nearby if nearby else "NOT AVAILABLE", 
 
-            personal_memories="\n".join(personal_memories) or "None",       
-            conversation_memories="\n".join(conversation_memories) or "None", 
+            personal_memories=personal_str,
+            conversation_memories=conversation_str,
+
         )    
     response = llm.invoke([
         SystemMessage(content=system_prompt),
