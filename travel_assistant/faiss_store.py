@@ -230,7 +230,7 @@ def search_documents(
 
 
 def save_index():
-     t0 = time.perf_counter()
+    t0 = time.perf_counter()
 
 
     faiss.write_index(index, INDEX_FILE)
