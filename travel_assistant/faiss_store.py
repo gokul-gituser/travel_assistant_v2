@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import json
 from .chunking import chunk_text
 load_dotenv()
+import logging
 
 logger = logging.getLogger(__name__)
 
