@@ -22,6 +22,7 @@ def search_user_memory(
     m = get_mem0()
 
     try:
+        t0 = time.perf_counter()
         results = m.search(
             query=query,
             limit=limit,
