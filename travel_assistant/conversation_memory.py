@@ -6,12 +6,15 @@ def chat_interaction(
     user_id: str,
     user_message: str,
     assistant_reply: str,
+    handler: str | None = None,
+
 ):
 
     now = datetime.now(timezone.utc)
     base_meta = {
         "username": user_id,
         "source": "chat",
+        "handler": handler,
         "year": now.year,
         "month": now.month,
         "day": now.day,

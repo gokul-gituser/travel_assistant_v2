@@ -2286,6 +2286,7 @@ async def run_travel_assistant(
         }
     }
     final_ai_message = None
+    final_handler = None
     for chunk in graph.stream(
         {"messages": [HumanMessage(content=text)]},
         config,
@@ -2294,7 +2295,15 @@ async def run_travel_assistant(
         last_msg = chunk["messages"][-1]
         if isinstance(last_msg, AIMessage):
             final_ai_message = last_msg
-    return final_ai_message.content if final_ai_message else "No response generated."
+
+        #new addition for faiss
+        last_results = chunk.get("last_results") 
+        if last_results:
+            final_handler = last_results[0].get("handler")
+    return {
+        "response": final_ai_message.content if final_ai_message else "No response generated.",
+        "handler": final_handler,
+    }
 
 
 if __name__ == "__main__":        

@@ -27,6 +27,7 @@ from travel_assistant.faiss_store import (
 CHUNK_SIZE = 300
 OVERLAP    = 50
 TOP_K      = 5
+SCORE_THRESHOLD  = 1.5
 USER_ID    = "eval_user_001"
 
 # ── Seed data ────────────────────────────────────────────────────────────────
@@ -173,6 +174,7 @@ def run_eval():
             query=query,
             top_k=TOP_K,
             filters={"username": USER_ID},
+            score_threshold=SCORE_THRESHOLD
         )
 
         retrieved_texts = [h["text"] for h in hits]
