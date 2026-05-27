@@ -80,7 +80,7 @@ def search_conversations(
             "handler": handler,
         })
         for r in results:
-        print("RESULT:", r["metadata"].get("handler"), "->", r["text"][:120])
+            print("RESULT:", r["metadata"].get("handler"), "->", r["text"][:120])
 
         return [
             item["text"]
