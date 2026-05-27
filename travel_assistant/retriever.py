@@ -72,6 +72,15 @@ def search_conversations(
                 "username": user_id,
             }
         )
+        print("\n=== FAISS SEARCH ===")
+        print("QUERY:", query)
+        print("HANDLER:", handler)
+        print("FILTERS:", {
+            "username": user_id,
+            "handler": handler,
+        })
+        for r in results:
+        print("RESULT:", r["metadata"].get("handler"), "->", r["text"][:120])
 
         return [
             item["text"]

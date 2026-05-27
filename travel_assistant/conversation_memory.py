@@ -36,4 +36,6 @@ def chat_interaction(
     print("\n=== SAVING CHAT TO FAISS ===")
     print("USER:", user_message)
     print("ASSISTANT:", assistant_reply)
+    print("HANDLER:", handler)
+    print("CONVERSATION_ID:", base_meta["conversation_id"])
     print("============================\n")
