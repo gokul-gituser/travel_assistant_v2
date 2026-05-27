@@ -1590,6 +1590,8 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
 def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Suggest based on mood/situation"""
     user_id = config["configurable"].get("user_id")
+    user_msg = state["messages"][-1].content
+
     user_profile_text = get_user_profile_text(store, user_id)
 
     travel_history_text = get_travel_history_text(store, user_id)
@@ -1668,6 +1670,8 @@ def handle_itinerary(state, config, *, store):
     """
  
     user_id             = config["configurable"].get("user_id")
+    user_msg = state["messages"][-1].content
+
     user_profile_text   = get_user_profile_text(store, user_id)
     travel_history_text = get_travel_history_text(store, user_id)
  
@@ -1770,6 +1774,8 @@ def handle_itinerary(state, config, *, store):
 def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Food & dietary recommendations"""
     user_id = config["configurable"].get("user_id")
+    user_msg = state["messages"][-1].content
+
     user_profile_text = get_user_profile_text(store, user_id)
 
     travel_history_text = get_travel_history_text(store, user_id)
@@ -1833,6 +1839,8 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
 def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Friend-based recommendations"""
     user_id = config["configurable"].get("user_id")
+    user_msg = state["messages"][-1].content
+
     user_profile_text = get_user_profile_text(store, user_id)
 
     travel_history_text = get_travel_history_text(store, user_id)
@@ -1903,6 +1911,8 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
 def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Safety & practical travel help"""
     user_id = config["configurable"].get("user_id")
+    user_msg = state["messages"][-1].content
+
     user_profile_text = get_user_profile_text(store, user_id)
 
     travel_history_text = get_travel_history_text(store, user_id)
