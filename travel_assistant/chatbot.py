@@ -1510,6 +1510,7 @@ def should_proceed_to_enrichment(state) -> str:
 def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Find nearby places"""
     user_id = config["configurable"].get("user_id")
+    user_msg = state["messages"][-1].content
     user_profile_text = get_user_profile_text(store, user_id)
 
     travel_history_text = get_travel_history_text(store, user_id)
