@@ -951,14 +951,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     user_id = configurable.get("user_id")
     user_msg = state["messages"][-1].content
 
-    retrieved_context = retrieve_context(
-        user_id=user_id,
-        query=user_msg,
-    )
-
-    print("\n===== RETRIEVED CONTEXT =====")
-    print(retrieved_context)
-    print("================================\n")
+    
 
     friend_places_context = configurable.get("friend_places_context", "")  
     print(f"CONTEXT_BUILDER GOT friend_places_context: {repr(friend_places_context)}")
@@ -1049,7 +1042,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
         "last_results": last_results,
         "location_history_text": location_history_text,
         "friend_places_context": friend_places_context,
-        "retrieved_context": retrieved_context,
+        "retrieved_context": {},
     }
 
 
@@ -1548,9 +1541,10 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
 
     location_history_text = state.get("location_history_text", "No location history yet")
 
-    retrieved_context = state.get(
-        "retrieved_context",
-        {},
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_A_NEARBY_GENERIC.value,
     )
 
     personal_memories = retrieved_context.get(
@@ -1610,9 +1604,10 @@ def handle_nearby_by_need(state: GraphState, config: RunnableConfig, *, store: B
         if location else "NOT AVAILABLE"
     )
 
-    retrieved_context = state.get(
-        "retrieved_context",
-        {},
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_B_NEARBY_BY_NEED.value,
     )
 
     personal_memories = retrieved_context.get(
@@ -1677,9 +1672,10 @@ def handle_itinerary(state, config, *, store):
  
     ctx          = state.get("itinerary_context") or {}
 
-    retrieved_context = state.get(
-        "retrieved_context",
-        {},
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_C_ITINERARY.value,
     )
 
     personal_memories = retrieved_context.get(
@@ -1784,9 +1780,10 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
     preferences = state.get("preferences")
     last_results = state.get("last_results") 
 
-    retrieved_context = state.get(
-        "retrieved_context",
-        {},
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_D_FOOD_DIETARY.value,
     )
 
     personal_memories = retrieved_context.get(
@@ -1852,9 +1849,10 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
     print("friend_places_context:", friend_places_context or "(EMPTY)")
     print("=======================================\n")
 
-    retrieved_context = state.get(
-        "retrieved_context",
-        {},
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_E_FRIENDS_BASED.value,
     )
 
     personal_memories = retrieved_context.get(
@@ -1922,9 +1920,10 @@ def handle_safety_practical(state: GraphState, config: RunnableConfig, *, store:
     {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
 
 """
-    retrieved_context = state.get(
-        "retrieved_context",
-        {},
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
     )
 
     personal_memories = retrieved_context.get(
@@ -1976,7 +1975,11 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
     location_history_text = state.get("location_history_text", "No location history yet")
 
        # ── FAISS retrieved context ──────────────────────────────────────────
-    retrieved_context = state.get("retrieved_context", {})
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_FALLBACK_GENERAL_TRAVEL.value,
+    )
     personal_memories = retrieved_context.get("personal_memories", [])
     conversation_memories = retrieved_context.get("conversation_memories", [])
     # ────────────────────────────────────────────────────────────────────
@@ -2009,7 +2012,8 @@ def handle_fallback(state: GraphState, config: RunnableConfig, *, store: BaseSto
     print(response.content)
     print("=======================\n")
     
-    return {"messages": [AIMessage(content=response.content)]} 
+    return {"messages": [AIMessage(content=response.content)], 
+    "last_results": [{"handler": Intent.INTENT_FALLBACK_GENERAL_TRAVEL.value, "response": response.content}]} 
 
 
 def handle_urgent(state: GraphState, config: RunnableConfig, *, store: BaseStore):

@@ -60,25 +60,27 @@ def search_user_memory(
 def search_conversations(
     user_id: str,
     query: str,
+    handler: str | None = None,
     limit: int = 5,
 ) -> List[str]:
 
     try:
+        filters = {
+            "username": user_id,
+        }
+
+        if handler:
+            filters["handler"] = handler
 
         results = search_documents(
             query=query,
             top_k=limit,
-            filters={
-                "username": user_id,
-            }
+            filters=filters
         )
         print("\n=== FAISS SEARCH ===")
         print("QUERY:", query)
         print("HANDLER:", handler)
-        print("FILTERS:", {
-            "username": user_id,
-            "handler": handler,
-        })
+        print("FILTERS:", filters)
         for r in results:
             print("RESULT:", r["metadata"].get("handler"), "->", r["text"][:120])
 
@@ -95,6 +97,8 @@ def search_conversations(
 def retrieve_context(
     user_id: str,
     query: str,
+    handler: str | None = None,
+
 ) -> Dict[str, List[str]]:
 
     personal_memories = search_user_memory(
@@ -106,6 +110,8 @@ def retrieve_context(
     conversation_memories = search_conversations(
         user_id=user_id,
         query=query,
+        handler=handler,
+
         limit=5,
     )
 
