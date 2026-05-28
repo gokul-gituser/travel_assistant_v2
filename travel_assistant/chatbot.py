@@ -98,7 +98,9 @@ def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
             timeout=70,
             headers={
                 "Accept": "application/json",
+                
                 "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "TravelAssistantChatbot/1.0 ",
             }
         )
         print(f"Overpass status: {resp.status_code}")
