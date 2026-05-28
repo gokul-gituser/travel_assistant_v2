@@ -96,6 +96,10 @@ def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
             "https://overpass-api.de/api/interpreter",
             data={"data": query},
             timeout=70,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
         )
         print(f"Overpass status: {resp.status_code}")
         print(f"Overpass response (first 200 chars): {resp.text[:200]}")
