@@ -97,6 +97,8 @@ def _fetch_destination_places(lat: float, lng: float) -> List[Dict]:
             data={"data": query},
             timeout=70,
         )
+        print(f"Overpass status: {resp.status_code}")
+        print(f"Overpass response (first 200 chars): {resp.text[:200]}")
         if resp.status_code != 200:
             return []
         data = resp.json()
@@ -433,18 +435,7 @@ RULES:
 User profile:
 {user_profile}
 
-MEMORY RULES:
-- Use retrieved conversation memories only if relevant to the current itinerary.
-- Prefer recent travel-related memories over unrelated chats.
-- Do not invent itinerary details not present in retrieved context.
-- Use previous preferences to personalize recommendations.
-- If memories conflict, prioritize the newest information.
 
-Relevant personal memories:
-{{personal_memories}}
-
-Relevant conversation memories:
-{{conversation_memories}}
  
 Trip parameters:
   Destination:      {destination}
@@ -1730,8 +1721,7 @@ def handle_itinerary(state, config, *, store):
         travel_history = travel_history_text,
         last_results   = last_results or "No previous results",
         places_block   = places_block,
-        personal_memories=personal_str,
-        conversation_memories=conversation_str,
+        
     )
 
     # Add conversation context to prompt
