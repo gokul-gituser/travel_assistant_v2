@@ -1345,7 +1345,7 @@ def collect_itinerary_context(state, config, *, store):
     
     Process:
     1. Extract parameters from latest user message using LLM
-    2. Merge with existing context (don't overwrite confirmed values)
+    2. Merge with existing context 
     3. Auto-fill current_location from device location if available
     4. Find first missing required field
     5. Ask for it, or proceed to enrichment if all collected
@@ -1363,8 +1363,14 @@ def collect_itinerary_context(state, config, *, store):
     
     # 2. Merge extracted params (only if not already confirmed in ctx)
     for key, value in extracted.items():
-        if not ctx.get(key):  # Don't overwrite if already set
-            ctx[key] = value
+        if value is None or value == "" or value == "null":
+            continue  # skip nulls — don't touch existing values
+        
+        existing = ctx.get(key)
+        if existing and existing != value:
+            logger.info(f"User updated {key}: '{existing}' → '{value}'")
+        
+        ctx[key] = value  # overwrite with new value if provided
     
     # 3. Auto-fill current_location from device location if available
     if not ctx.get("current_location") and state.get("location"):
