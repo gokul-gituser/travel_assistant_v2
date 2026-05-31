@@ -22,6 +22,7 @@ from langchain.agents.structured_output import ProviderStrategy
 from typing import Optional, List, Literal
 from pydantic import BaseModel
 
+from .facebook_post_retrieve import get_friends_posts
 from .format_retrieved_context import format_retrieved_context
 from .mem0_store import Mem0Store
 from .retriever import retrieve_context
@@ -1837,7 +1838,7 @@ def handle_food_dietary(state: GraphState, config: RunnableConfig, *, store: Bas
     return {"messages": [AIMessage(content=response.content)],
              "last_results": [{"handler": Intent.INTENT_D_FOOD_DIETARY.value, "response": response.content}]} 
 
-
+'''
 def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Friend-based recommendations"""
     user_id = config["configurable"].get("user_id")
@@ -1898,6 +1899,216 @@ def handle_friends_based(state: GraphState, config: RunnableConfig, *, store: Ba
         conversation_memories=conversation_str,
         last_results=last_results or "No previous results") + context_text
     
+    response = llm.invoke([
+        SystemMessage(content=system_prompt),
+        *state["messages"]
+    ])
+    print("\n===== AI RESPONSE =====")
+    print(response.content)
+    print("=======================\n")
+    
+    return {"messages": [AIMessage(content=response.content)],
+             "last_results": [{"handler": Intent.INTENT_E_FRIENDS_BASED.value, "response": response.content}]} 
+'''
+def handle_friends_based(
+    state: GraphState,
+    config: RunnableConfig,
+    *,
+    store: BaseStore
+):
+    user_id = config["configurable"].get("user_id")
+    user_msg = state["messages"][-1].content
+
+    user_profile_text = get_user_profile_text(store, user_id)
+
+    travel_history_text = get_travel_history_text(store, user_id)
+
+    retrieved_context = retrieve_context(
+        user_id=user_id,
+        query=user_msg,
+        handler=Intent.INTENT_E_FRIENDS_BASED.value,
+    )
+
+    personal_memories = retrieved_context.get(
+        "personal_memories",
+        [],
+    )
+
+    conversation_memories = retrieved_context.get(
+        "conversation_memories",
+        [],
+    )
+    personal_str, conversation_str = format_retrieved_context(personal_memories, conversation_memories)
+
+    friend_places_context = ""
+
+    try:
+        posts = get_friends_posts(store, user_id)
+
+        print(
+            f"DEBUG [Friends Node]: Collected {len(posts)} posts for processing."
+        )
+
+        if posts:
+
+            posts = posts[:20]
+
+            from collections import defaultdict
+
+            lines = [
+                "FRIENDS ACTIVITY (use only if relevant to user's question):"
+            ]
+
+            posts_by_friend = defaultdict(list)
+
+            mapping = store.get(
+                ("user_mapping", user_id),
+                "fb_id"
+            )
+
+            fb_user_id = (
+                mapping.value if mapping else user_id
+            )
+
+            for post in posts:
+                friend_id = post.get("friend_fb_id") or "unknown"
+
+                if (
+                    post.get("message", "").strip()
+                    or post.get("place_name")
+                ):
+                    posts_by_friend[friend_id].append(post)
+
+            for friend_id, friend_posts in posts_by_friend.items():
+
+                name_obj = store.get(
+                    ("fb_friend_names", fb_user_id),
+                    friend_id
+                )
+
+                friend_name = (
+                    name_obj.value
+                    if name_obj
+                    else f"Friend({friend_id[-4:]})"
+                )
+
+                hometown_obj = store.get(
+                    ("fb_profile", friend_id),
+                    "hometown"
+                )
+
+                city_obj = store.get(
+                    ("fb_profile", friend_id),
+                    "current_city"
+                )
+
+                hometown = (
+                    hometown_obj.value
+                    if hometown_obj
+                    else None
+                )
+
+                current_city = (
+                    city_obj.value
+                    if city_obj
+                    else None
+                )
+
+                lines.append(f"\nFriend: {friend_name}")
+
+                if current_city:
+                    lines.append(
+                        f"  [PROFILE - permanent residence]: {current_city}"
+                    )
+
+                if hometown:
+                    lines.append(
+                        f"  [PROFILE - hometown where they grew up]: {hometown}"
+                    )
+
+                for post in friend_posts:
+
+                    text = post.get("message", "")
+                    place = post.get("place_name")
+                    city = (
+                        post.get("place_city")
+                        or post.get("place_country")
+                    )
+
+                    if place and text:
+                        lines.append(
+                            f'  [FACEBOOK POST - may indicate travel]: "{text}" '
+                            f'tagged at {place}'
+                            + (f", {city}" if city else "")
+                        )
+
+                    elif place:
+                        lines.append(
+                            f"  [FACEBOOK POST - may indicate travel]: "
+                            f"checked in at {place}"
+                            + (f", {city}" if city else "")
+                        )
+
+                    elif text:
+                        lines.append(f"  - {text}")
+
+            friend_places_context = "\n".join(lines)
+
+    except Exception as e:
+        print(
+            f"⚠️ Error lazy loading Facebook context in node: {e}"
+        )
+        friend_places_context = ""
+    
+    print("\n===== DEBUG handle_friends_based =====")
+    print(
+        "friend_places_context:",
+        friend_places_context[:1000]
+        if friend_places_context
+        else "(EMPTY)"
+    )
+    print("=======================================\n")
+
+    user_profile_text = get_user_profile_text(
+        store,
+        user_id
+    )
+
+    travel_history_text = get_travel_history_text(
+        store,
+        user_id
+    )
+
+    location = state.get("location")
+    nearby = state.get("nearby_context") or ""
+    time_context = state.get("time_context")
+    preferences = state.get("preferences")
+    last_results = state.get("last_results") 
+
+    context_text = f"""
+    Current Location: {location.get('city') if location else 'Unknown'} {f"(lat: {location.get('lat')}, lng: {location.get('lng')})" if location else ''}
+    Current Time: {time_context.get('day_of_week')} {time_context.get('local_time')}
+    User Preferences: vibe={preferences.get('vibe') if preferences else None}, cuisine={preferences.get('cuisine') if preferences else None}, budget={preferences.get('budget') if preferences else None}
+    {f"Real nearby places:{chr(10)}{nearby}" if nearby else ""}
+"""
+
+    if friend_places_context:
+        context_text += f"\n\n{friend_places_context}\n"
+        context_text += "\nIMPORTANT: Friend activity data is provided above. Use it directly to answer the user's question.\n"
+    else:
+        context_text += "\nFRIEND DATA: No friend activity available yet.\n"
+    
+
+    system_prompt = SYSTEM_PROMPT_FRIENDS_BASED.format(
+        user_profile=user_profile_text,
+        travel_history=travel_history_text,
+        
+        personal_memories=personal_str,
+        conversation_memories=conversation_str,
+        last_results=last_results or "No previous results") + context_text
+    
+    
+
     response = llm.invoke([
         SystemMessage(content=system_prompt),
         *state["messages"]
