@@ -1,3 +1,4 @@
+from langgraph.store.base import BaseStore
 
 
 def get_friends_posts(store: BaseStore, user_id: str):
