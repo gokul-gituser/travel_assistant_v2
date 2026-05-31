@@ -1136,6 +1136,7 @@ def get_user_profile_text(store: BaseStore, user_id: str) -> str:
 
 
 def get_travel_history_text(store: BaseStore, user_id: str) -> str:
+    '''
     if not user_id:
         return "No travel history"
     
@@ -1150,7 +1151,7 @@ def get_travel_history_text(store: BaseStore, user_id: str) -> str:
     print("\n===== TRAVEL HISTORY DEBUG =====")
     print(history)
     print("================================\n")
-    
+
     lines = []
     for trip in history:
         places = ", ".join(trip.get("places_visited", []))
@@ -1159,6 +1160,8 @@ def get_travel_history_text(store: BaseStore, user_id: str) -> str:
             f"visited {places} in {trip['time_of_visit']} ({trip['hours_spent']} hrs)"
         )
     return "\n".join(lines)
+    '''
+    return ""
 
 
 def router_node(state: GraphState, config: RunnableConfig, *, store: BaseStore):
