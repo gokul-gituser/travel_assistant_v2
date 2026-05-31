@@ -1146,6 +1146,11 @@ def get_travel_history_text(store: BaseStore, user_id: str) -> str:
         return "No travel history"
     
     history = existing.value
+
+    print("\n===== TRAVEL HISTORY DEBUG =====")
+    print(history)
+    print("================================\n")
+    
     lines = []
     for trip in history:
         places = ", ".join(trip.get("places_visited", []))
