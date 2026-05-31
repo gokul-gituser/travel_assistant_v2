@@ -1159,8 +1159,29 @@ def get_travel_history_text(store: BaseStore, user_id: str) -> str:
 def router_node(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     user_msg = state["messages"][-1].content
 
-        # If already in itinerary flow, don't re-classify
-    if state.get("itinerary_context"):
+    ctx = state.get("itinerary_context") or {}
+
+    required_fields = [
+        "destination",
+        "current_location",
+        "num_days",
+        "party_size",
+        "transport_to",
+        "transport_within",
+        "cuisine",
+        "interests",
+    ]
+
+    missing_fields = [
+        field for field in required_fields
+        if not ctx.get(field)
+    ]
+
+    if ctx and missing_fields:
+        logger.info(
+            f"Itinerary collection in progress. Missing fields: {missing_fields}"
+        )
+
         return {
             "classification": {
                 "primary_intent": Intent.INTENT_C_ITINERARY.value,
