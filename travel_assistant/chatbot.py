@@ -1564,8 +1564,8 @@ async def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, st
     #nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
-    print("DEBUG: NEARBY CONTEXT SENT TO LLM:")
-    print(nearby)
+    #print("DEBUG: NEARBY CONTEXT SENT TO LLM:")
+    #print(nearby)
 
     #raw_places = config["configurable"].get("raw_places") or []
     last_results = state.get("last_results") 
