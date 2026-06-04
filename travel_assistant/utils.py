@@ -1,5 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+import json
 
 extractor_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0,
     max_completion_tokens=2000  #
