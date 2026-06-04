@@ -2477,6 +2477,13 @@ async def _build_graph_async():
 
 
     REDIS_URI = os.getenv("REDIS_URL")
+    async with AsyncRedisSaver.from_conn_string(REDIS_URI) as checkpointer:
+        await checkpointer.asetup()
+        async with AsyncRedisStore.from_conn_string(REDIS_URI) as store:
+            await store.asetup()
+            graph = builder.compile(checkpointer=checkpointer, store=store)
+
+    return graph
     """
     with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
         checkpointer.setup()
