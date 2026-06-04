@@ -1,5 +1,7 @@
 
-#new addition
+extractor_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0,
+    max_completion_tokens=2000  #
+    )
 
 async def extract_overpass_tag(message: str) -> tuple[str, str] | None:
     """Use LLM to extract the best Overpass tag from a user message."""
