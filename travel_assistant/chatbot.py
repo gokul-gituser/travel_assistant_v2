@@ -2409,7 +2409,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     """ 
 
 
-def _build_graph_async():
+async def _build_graph_async():
     builder = StateGraph(GraphState)
 
     builder.add_node("context_builder", context_builder)
