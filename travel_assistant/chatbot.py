@@ -1032,7 +1032,7 @@ async def context_builder(state: GraphState, config: RunnableConfig, *, store: B
     print(f"---------------------\n")
 
     history_namespace = ("location_history", user_id)
-    existing_history = await store.get(history_namespace, "history")
+    existing_history = await store.aget(history_namespace, "history")
     location_history = existing_history.value if existing_history else []
     location_history_text = "\n".join([
         f"{h['date']} {h['time']} — {h['address']} ({h['lat']}, {h['lon']})"
@@ -1132,7 +1132,7 @@ async def get_user_profile_text(store: BaseStore, user_id: str) -> str:
         return "No user profile"
     
     namespace = ("user_profile", user_id)
-    existing = await store.get(namespace, "profile")
+    existing = await store.aget(namespace, "profile")
     
     if not existing:
         return "No user profile"
@@ -2341,7 +2341,7 @@ async def write_memory(state: GraphState, config: RunnableConfig, *, store: Base
     
     # Retrieve existing profile
     namespace = ("user_profile", user_id)
-    existing_memory =await store.get(namespace, "profile")
+    existing_memory =await store.aget(namespace, "profile")
     #existing profile wrapped because trustcall_extractor expects {"UserProfile": {...}}
     existing_profile = {"UserProfile": existing_memory.value} if existing_memory and existing_memory.value else None #added the and part
     
@@ -2358,7 +2358,7 @@ async def write_memory(state: GraphState, config: RunnableConfig, *, store: Base
     
     # Save updated profile
     updated_profile = result["responses"][0].model_dump()
-    await store.put(namespace, "profile", updated_profile)
+    await store.aput(namespace, "profile", updated_profile)
 
     return state
     """
