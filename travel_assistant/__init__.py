@@ -8,8 +8,8 @@ A reusable module for a travel chatbot with:
 - Nearby places context (injected by caller)
 """
 
-from .chatbot import run_travel_assistant
+from .chatbot import run_travel_assistant,stream_travel_assistant
 
 __version__ = "1.0.0"
 __author__ = "gokul"
-__all__ = ["run_travel_assistant"]
+__all__ = ["run_travel_assistant","stream_travel_assistant"]
