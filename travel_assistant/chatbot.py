@@ -1551,7 +1551,7 @@ def should_proceed_to_enrichment(state) -> str:
     return "enrich"  # All collected, proceed
  
 
-def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: BaseStore):
+async def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Find nearby places"""
     user_id = config["configurable"].get("user_id")
     user_msg = state["messages"][-1].content
@@ -1561,23 +1561,16 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
 
     # context for system prompt
     location = state.get("location")
-    nearby = state.get("nearby_context") or ""
+    #nearby = state.get("nearby_context") or ""
     time_context = state.get("time_context")
     preferences = state.get("preferences")
     print("DEBUG: NEARBY CONTEXT SENT TO LLM:")
     print(nearby)
 
-    raw_places = config["configurable"].get("raw_places") or []
+    #raw_places = config["configurable"].get("raw_places") or []
     last_results = state.get("last_results") 
+    
 
-    if not nearby and last_results:
-        prev_places = last_results[0].get("raw_places", [])
-        if prev_places:
-            nearby = "\n".join(
-                f"{i+1}. {p['name']} ({p['type']}) — {p['distance']}m"
-                for i, p in enumerate(prev_places)
-            )
-            raw_places = prev_places  # keep for storage
 
     location_context = (
         f"{location.get('city')} (lat: {location.get('lat')}, lng: {location.get('lng')})"
@@ -1606,11 +1599,24 @@ def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, store: B
     personal_str, conversation_str = format_retrieved_context(personal_memories, conversation_memories)
    
     
+    raw_places  = []
+    llm_context = ""
+    if location:
+        extracted_tag = await extract_overpass_tag(user_msg)
+        if extracted_tag:
+            tag_key, tag_value = extracted_tag
+            raw_places = search_overpass(
+                location["lat"], location["lng"], tag_key, tag_value
+            )
+            print(f"🔍 [{Intent.INTENT_A_NEARBY_GENERIC.value}] {tag_key}={tag_value} → {len(raw_places)} places")
+        if raw_places:
+            llm_context, _ = build_context_and_display(raw_places)
+            
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
     location_context=location_context
     ,last_results=last_results or "No previous results",
     location_history=location_history_text
-    ,nearby_places=nearby if nearby else "NOT AVAILABLE",
+    ,nearby_places=llm_context if llm_context else "NOT AVAILABLE",
 
     personal_memories=personal_str,
     conversation_memories=conversation_str
