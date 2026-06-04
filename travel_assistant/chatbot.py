@@ -2538,7 +2538,7 @@ async def run_travel_assistant(
     print(f"DEBUG run_travel_assistant friend_places_context: {friend_places_context or '(EMPTY)'}")
 
 
-    graph = _get_graph()
+    graph =await  _get_graph()
 
     if thread_id is None:
         thread_id = f"travel-{user_id}"
@@ -2596,7 +2596,7 @@ async def stream_travel_assistant(
     timezone: Optional[str] = None,
     friend_places_context: Optional[str] = None,
 ):
-    graph = _get_graph()
+    graph =await _get_graph()
 
     if thread_id is None:
         thread_id = f"travel-{user_id}"
