@@ -4,6 +4,8 @@ from unittest import result
 import uuid
 import json
 import logging
+from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+from langgraph.store.redis.aio import AsyncRedisStore
 from typing import Annotated, Optional, Dict, List, TypedDict
 from dotenv import load_dotenv
 from langchain.tools import tool
@@ -2407,7 +2409,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     """ 
 
 
-def _build_graph():
+def _build_graph_async():
     builder = StateGraph(GraphState)
 
     builder.add_node("context_builder", context_builder)
@@ -2475,7 +2477,7 @@ def _build_graph():
 
 
     REDIS_URI = os.getenv("REDIS_URL")
-
+    """
     with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
         checkpointer.setup()
         #store = Mem0Store()
@@ -2483,25 +2485,34 @@ def _build_graph():
         with RedisStore.from_conn_string(REDIS_URI) as store:
             store.setup()
             graph = builder.compile(checkpointer=checkpointer, store=store)
-
-        """    mermaid = graph.get_graph().draw_mermaid()
+    """
+    """    mermaid = graph.get_graph().draw_mermaid()
             with open("chatbot_graph_1.mmd", "w", encoding="utf-8") as f:
                 f.write(mermaid)
             print("Wrote: chatbot_graph_1.mmd")
-"""
-            
+    """
+    #return graph
+    # AFTER
 
+
+    async def _build_graph_async():
+        async with AsyncRedisSaver.from_conn_string(REDIS_URI) as checkpointer:
+            await checkpointer.asetup()
+            async with AsyncRedisStore.from_conn_string(REDIS_URI) as store:
+                await store.asetup()
+                graph = builder.compile(checkpointer=checkpointer, store=store)
     return graph
     
 
 _graph = None
 
 
-def _get_graph():
+async def _get_graph():
     """Get or initialize the compiled graph (singleton pattern)"""
     global _graph
     if _graph is None:
-        _graph = _build_graph()
+        #_graph = _build_graph()
+        _graph = await _build_graph_async()
     return _graph
 
 DUMMY_LOCATION = {
