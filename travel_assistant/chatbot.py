@@ -2493,15 +2493,6 @@ async def _build_graph_async():
     """
     #return graph
     # AFTER
-
-
-    async def _build_graph_async():
-        async with AsyncRedisSaver.from_conn_string(REDIS_URI) as checkpointer:
-            await checkpointer.asetup()
-            async with AsyncRedisStore.from_conn_string(REDIS_URI) as store:
-                await store.asetup()
-                graph = builder.compile(checkpointer=checkpointer, store=store)
-        return graph
     
 
 _graph = None
