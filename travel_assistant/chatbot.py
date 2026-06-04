@@ -953,7 +953,7 @@ def build_time_context(tz_name: str | None = None) -> TimeContext:
     }
 
 
-def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseStore) -> Dict:
+async def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseStore) -> Dict:
     """Build context from config (location) and conversation (preferences/party/constraints)"""
     
     configurable = config.get("configurable", {})
@@ -1032,7 +1032,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     print(f"---------------------\n")
 
     history_namespace = ("location_history", user_id)
-    existing_history = store.get(history_namespace, "history")
+    existing_history = await store.get(history_namespace, "history")
     location_history = existing_history.value if existing_history else []
     location_history_text = "\n".join([
         f"{h['date']} {h['time']} — {h['address']} ({h['lat']}, {h['lon']})"
@@ -1126,13 +1126,13 @@ def classify_intent(user_input: str) -> IntentClassificationResult:
         safety_override=False,
     )
 
-def get_user_profile_text(store: BaseStore, user_id: str) -> str:
+async def get_user_profile_text(store: BaseStore, user_id: str) -> str:
     """Retrieve and format cross-thread user profile"""
     if not user_id:
         return "No user profile"
     
     namespace = ("user_profile", user_id)
-    existing = store.get(namespace, "profile")
+    existing = await store.get(namespace, "profile")
     
     if not existing:
         return "No user profile"
@@ -1146,7 +1146,7 @@ def get_user_profile_text(store: BaseStore, user_id: str) -> str:
             Notes: {profile.get('additional_notes', 'None')}"""
 
 
-def get_travel_history_text(store: BaseStore, user_id: str) -> str:
+async def get_travel_history_text(store: BaseStore, user_id: str) -> str:
     '''
     if not user_id:
         return "No travel history"
@@ -2332,7 +2332,7 @@ def handle_urgent(state: GraphState, config: RunnableConfig, *, store: BaseStore
     
 
 
-def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore):
+async def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Extract and save user profile from conversation"""
     user_id = config["configurable"].get("user_id")
     
@@ -2341,7 +2341,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     
     # Retrieve existing profile
     namespace = ("user_profile", user_id)
-    existing_memory = store.get(namespace, "profile")
+    existing_memory =await store.get(namespace, "profile")
     #existing profile wrapped because trustcall_extractor expects {"UserProfile": {...}}
     existing_profile = {"UserProfile": existing_memory.value} if existing_memory and existing_memory.value else None #added the and part
     
@@ -2358,7 +2358,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     
     # Save updated profile
     updated_profile = result["responses"][0].model_dump()
-    store.put(namespace, "profile", updated_profile)
+    await store.put(namespace, "profile", updated_profile)
 
     return state
     """
