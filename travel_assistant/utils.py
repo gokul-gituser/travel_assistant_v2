@@ -1,3 +1,4 @@
+from langchain_openai import ChatOpenAI
 
 extractor_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0,
     max_completion_tokens=2000  #
