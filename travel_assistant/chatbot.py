@@ -2564,6 +2564,78 @@ async def run_travel_assistant(
     }
 
 
+# These are the handler nodes whose tokens should stream to the user
+_STREAMING_NODES = {
+    Intent.INTENT_A_NEARBY_GENERIC.value,
+    Intent.INTENT_B_NEARBY_BY_NEED.value,
+    Intent.INTENT_C_ITINERARY.value,
+    Intent.INTENT_D_FOOD_DIETARY.value,
+    Intent.INTENT_E_FRIENDS_BASED.value,
+    Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
+    "General Chat/ Fallback",
+    "Health Emergency",
+    "clarification",
+}
+
+async def stream_travel_assistant(
+    user_id: str,
+    text: str,
+    location: Optional[dict] = None,
+    thread_id: Optional[str] = None,
+    timezone: Optional[str] = None,
+    friend_places_context: Optional[str] = None,
+):
+    graph = _get_graph()
+
+    if thread_id is None:
+        thread_id = f"travel-{user_id}"
+
+    config = {
+        "configurable": {
+            "user_id": user_id,
+            "thread_id": thread_id,
+            "location": location,
+            "timezone": timezone,
+            "connected_accounts": {"google": False, "facebook": False, "instagram": False},
+            "friend_places_context": friend_places_context or "",
+            # nearby_context and raw_places removed — handled inside handlers now
+        }
+    }
+
+    async for event in graph.astream_events(
+        {"messages": [HumanMessage(content=text)]},
+        config,
+        version="v2",
+    ):
+        event_name = event["event"]
+        tags = event.get("tags", [])
+        metadata = event.get("metadata", {})
+        
+        # Identify which graph node fired this event
+        node_name = metadata.get("langgraph_node", "")
+
+        # 1. Stream tokens ONLY from final handler nodes, not router/context_builder/write_memory
+        if event_name == "on_chat_model_stream" and node_name in _STREAMING_NODES:
+            chunk = event["data"]["chunk"]
+            token = chunk.content
+            if token:
+                yield token
+
+        # 2. When a handler node finishes, pick up raw_places if it set them
+        elif event_name == "on_chain_end" and node_name in _STREAMING_NODES:
+            output = event.get("data", {}).get("output", {})
+            if isinstance(output, dict) and output.get("raw_places"):
+                yield {"type": "places", "raw_places": output["raw_places"]}
+
+        # 3. Pick up handler name for background_tasks logging
+        elif event_name == "on_chain_end" and node_name in _STREAMING_NODES:
+            output = event.get("data", {}).get("output", {})
+            if isinstance(output, dict) and output.get("last_results"):
+                handler = output["last_results"][0].get("handler")
+                if handler:
+                    yield {"type": "meta", "handler": handler}
+
+
 if __name__ == "__main__":        
     print("\n🤖 Travel Assistant started. Type 'exit' to quit.\n")
     user_id = input("Enter user ID: ").strip()
