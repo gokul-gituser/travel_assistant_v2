@@ -2642,7 +2642,7 @@ async def stream_travel_assistant(
         if event_name == "on_chat_model_stream" and node_name in _STREAMING_NODES:
             chunk = event["data"]["chunk"]
             token = chunk.content
-            if token:
+            if token and not token.strip().startswith("{"):
                 yield token
 
         # 2. When a handler node finishes, pick up raw_places if it set them
