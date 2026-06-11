@@ -2424,7 +2424,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     """ 
 
 
-def _build_graph():
+async def _build_graph_async():
     builder = StateGraph(GraphState)
 
     builder.add_node("context_builder", context_builder)
@@ -2492,7 +2492,14 @@ def _build_graph():
 
 
     REDIS_URI = os.getenv("REDIS_URL")
+    async with AsyncRedisSaver.from_conn_string(REDIS_URI) as checkpointer:
+        checkpointer.setup()
+        async with AsyncRedisStore.from_conn_string(REDIS_URI) as store:
+            store.setup()
+            graph = builder.compile(checkpointer=checkpointer, store=store)
 
+    return graph
+    """
     with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
         checkpointer.setup()
         #store = Mem0Store()
@@ -2500,25 +2507,25 @@ def _build_graph():
         with RedisStore.from_conn_string(REDIS_URI) as store:
             store.setup()
             graph = builder.compile(checkpointer=checkpointer, store=store)
-
-        """    mermaid = graph.get_graph().draw_mermaid()
+    """
+    """    mermaid = graph.get_graph().draw_mermaid()
             with open("chatbot_graph_1.mmd", "w", encoding="utf-8") as f:
                 f.write(mermaid)
             print("Wrote: chatbot_graph_1.mmd")
-"""
-            
-
-    return graph
+    """
+    #return graph
+    # AFTER
     
 
 _graph = None
 
 
-def _get_graph():
+async def _get_graph():
     """Get or initialize the compiled graph (singleton pattern)"""
     global _graph
     if _graph is None:
-        _graph = _build_graph()
+        #_graph = _build_graph()
+        _graph = await _build_graph_async()
     return _graph
 
 DUMMY_LOCATION = {
@@ -2530,7 +2537,7 @@ DUMMY_LOCATION = {
     }
 
 
-def run_travel_assistant(
+async def run_travel_assistant(
     user_id: str,
     text: str,
     location: Optional[dict] = None,
@@ -2544,7 +2551,7 @@ def run_travel_assistant(
     print(f"DEBUG run_travel_assistant friend_places_context: {friend_places_context or '(EMPTY)'}")
 
 
-    graph = _get_graph()
+    graph =await  _get_graph()
 
     if thread_id is None:
         thread_id = f"travel-{user_id}"
@@ -2579,7 +2586,6 @@ def run_travel_assistant(
         "response": final_ai_message.content if final_ai_message else "No response generated.",
         "handler": final_handler,
     }
-
 
 
 
