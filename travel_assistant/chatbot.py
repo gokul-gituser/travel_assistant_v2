@@ -2530,7 +2530,7 @@ DUMMY_LOCATION = {
     }
 
 
-async def run_travel_assistant(
+def run_travel_assistant(
     user_id: str,
     text: str,
     location: Optional[dict] = None,
@@ -2544,7 +2544,7 @@ async def run_travel_assistant(
     print(f"DEBUG run_travel_assistant friend_places_context: {friend_places_context or '(EMPTY)'}")
 
 
-    graph =await  _get_graph()
+    graph = _get_graph()
 
     if thread_id is None:
         thread_id = f"travel-{user_id}"
