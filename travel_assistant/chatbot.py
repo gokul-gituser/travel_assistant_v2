@@ -2424,7 +2424,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     """ 
 
 
-async def _build_graph_async():
+def _build_graph():
     builder = StateGraph(GraphState)
 
     builder.add_node("context_builder", context_builder)
@@ -2492,14 +2492,7 @@ async def _build_graph_async():
 
 
     REDIS_URI = os.getenv("REDIS_URL")
-    async with AsyncRedisSaver.from_conn_string(REDIS_URI) as checkpointer:
-        checkpointer.setup()
-        async with AsyncRedisStore.from_conn_string(REDIS_URI) as store:
-            store.setup()
-            graph = builder.compile(checkpointer=checkpointer, store=store)
 
-    return graph
-    """
     with RedisSaver.from_conn_string(REDIS_URI) as checkpointer:
         checkpointer.setup()
         #store = Mem0Store()
@@ -2507,25 +2500,25 @@ async def _build_graph_async():
         with RedisStore.from_conn_string(REDIS_URI) as store:
             store.setup()
             graph = builder.compile(checkpointer=checkpointer, store=store)
-    """
-    """    mermaid = graph.get_graph().draw_mermaid()
+
+        """    mermaid = graph.get_graph().draw_mermaid()
             with open("chatbot_graph_1.mmd", "w", encoding="utf-8") as f:
                 f.write(mermaid)
             print("Wrote: chatbot_graph_1.mmd")
-    """
-    #return graph
-    # AFTER
+"""
+            
+
+    return graph
     
 
 _graph = None
 
 
-async def _get_graph():
+def _get_graph():
     """Get or initialize the compiled graph (singleton pattern)"""
     global _graph
     if _graph is None:
-        #_graph = _build_graph()
-        _graph = await _build_graph_async()
+        _graph = _build_graph()
     return _graph
 
 DUMMY_LOCATION = {
@@ -2588,76 +2581,8 @@ async def run_travel_assistant(
     }
 
 
-# These are the handler nodes whose tokens should stream to the user
-_STREAMING_NODES = {
-    Intent.INTENT_A_NEARBY_GENERIC.value,
-    Intent.INTENT_B_NEARBY_BY_NEED.value,
-    Intent.INTENT_C_ITINERARY.value,
-    Intent.INTENT_D_FOOD_DIETARY.value,
-    Intent.INTENT_E_FRIENDS_BASED.value,
-    Intent.INTENT_F_SAFETY_AND_PRACTICAL_TRAVEL_HELP.value,
-    "General Chat/ Fallback",
-    "Health Emergency",
-    "clarification",
-}
 
-async def stream_travel_assistant(
-    user_id: str,
-    text: str,
-    location: Optional[dict] = None,
-    thread_id: Optional[str] = None,
-    timezone: Optional[str] = None,
-    friend_places_context: Optional[str] = None,
-):
-    graph =await _get_graph()
 
-    if thread_id is None:
-        thread_id = f"travel-{user_id}"
-
-    config = {
-        "configurable": {
-            "user_id": user_id,
-            "thread_id": thread_id,
-            "location": location,
-            "timezone": timezone,
-            "connected_accounts": {"google": False, "facebook": False, "instagram": False},
-            "friend_places_context": friend_places_context or "",
-            # nearby_context and raw_places removed — handled inside handlers now
-        }
-    }
-
-    async for event in graph.astream_events(
-        {"messages": [HumanMessage(content=text)]},
-        config,
-        version="v2",
-    ):
-        event_name = event["event"]
-        tags = event.get("tags", [])
-        metadata = event.get("metadata", {})
-        
-        # Identify which graph node fired this event
-        node_name = metadata.get("langgraph_node", "")
-
-        # 1. Stream tokens ONLY from final handler nodes, not router/context_builder/write_memory
-        if event_name == "on_chat_model_stream" and node_name in _STREAMING_NODES:
-            chunk = event["data"]["chunk"]
-            token = chunk.content
-            if token:
-                yield token
-
-        # 2. When a handler node finishes, pick up raw_places if it set them
-        elif event_name == "on_chain_end" and node_name in _STREAMING_NODES:
-            output = event.get("data", {}).get("output", {})
-            if isinstance(output, dict) and output.get("raw_places"):
-                yield {"type": "places", "raw_places": output["raw_places"]}
-
-        # 3. Pick up handler name for background_tasks logging
-        elif event_name == "on_chain_end" and node_name in _STREAMING_NODES:
-            output = event.get("data", {}).get("output", {})
-            if isinstance(output, dict) and output.get("last_results"):
-                handler = output["last_results"][0].get("handler")
-                if handler:
-                    yield {"type": "meta", "handler": handler}
 
 
 if __name__ == "__main__":        
