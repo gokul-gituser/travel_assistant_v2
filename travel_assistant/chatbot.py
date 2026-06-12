@@ -1032,7 +1032,7 @@ def context_builder(state: GraphState, config: RunnableConfig, *, store: BaseSto
     print(f"---------------------\n")
 
     history_namespace = ("location_history", user_id)
-    existing_history = store.get(history_namespace, "history")
+    existing_history = store.aget(history_namespace, "history")
     location_history = existing_history.value if existing_history else []
     location_history_text = "\n".join([
         f"{h['date']} {h['time']} — {h['address']} ({h['lat']}, {h['lon']})"
@@ -1126,13 +1126,13 @@ def classify_intent(user_input: str) -> IntentClassificationResult:
         safety_override=False,
     )
 
-def get_user_profile_text(store: BaseStore, user_id: str) -> str:
+async def get_user_profile_text(store: BaseStore, user_id: str) -> str:
     """Retrieve and format cross-thread user profile"""
     if not user_id:
         return "No user profile"
     
     namespace = ("user_profile", user_id)
-    existing = store.get(namespace, "profile")
+    existing = store.aget(namespace, "profile")
     
     if not existing:
         return "No user profile"
@@ -1555,7 +1555,7 @@ async def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, st
     """Find nearby places"""
     user_id = config["configurable"].get("user_id")
     user_msg = state["messages"][-1].content
-    user_profile_text = get_user_profile_text(store, user_id)
+    user_profile_text = await get_user_profile_text(store, user_id)
 
     travel_history_text = get_travel_history_text(store, user_id)
 
@@ -2007,7 +2007,7 @@ def handle_friends_based(
 
             posts_by_friend = defaultdict(list)
 
-            mapping = store.get(
+            mapping = store.aget(
                 ("user_mapping", user_id),
                 "fb_id"
             )
@@ -2027,7 +2027,7 @@ def handle_friends_based(
 
             for friend_id, friend_posts in posts_by_friend.items():
 
-                name_obj = store.get(
+                name_obj = store.aget(
                     ("fb_friend_names", fb_user_id),
                     friend_id
                 )
@@ -2038,12 +2038,12 @@ def handle_friends_based(
                     else f"Friend({friend_id[-4:]})"
                 )
 
-                hometown_obj = store.get(
+                hometown_obj = store.aget(
                     ("fb_profile", friend_id),
                     "hometown"
                 )
 
-                city_obj = store.get(
+                city_obj = store.aget(
                     ("fb_profile", friend_id),
                     "current_city"
                 )
@@ -2332,7 +2332,7 @@ def handle_urgent(state: GraphState, config: RunnableConfig, *, store: BaseStore
     
 
 
-def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore):
+async def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore):
     """Extract and save user profile from conversation"""
     user_id = config["configurable"].get("user_id")
     
@@ -2341,7 +2341,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     
     # Retrieve existing profile
     namespace = ("user_profile", user_id)
-    existing_memory = store.get(namespace, "profile")
+    existing_memory = store.aget(namespace, "profile")
     #existing profile wrapped because trustcall_extractor expects {"UserProfile": {...}}
     existing_profile = {"UserProfile": existing_memory.value} if existing_memory and existing_memory.value else None #added the and part
     
@@ -2358,7 +2358,7 @@ def write_memory(state: GraphState, config: RunnableConfig, *, store: BaseStore)
     
     # Save updated profile
     updated_profile = result["responses"][0].model_dump()
-    store.put(namespace, "profile", updated_profile)
+    store.aput(namespace, "profile", updated_profile)
 
     return state
     """

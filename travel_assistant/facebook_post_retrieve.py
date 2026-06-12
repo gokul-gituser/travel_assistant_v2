@@ -1,10 +1,10 @@
 from langgraph.store.base import BaseStore
 
 
-def get_friends_posts(store: BaseStore, user_id: str):
+async def get_friends_posts(store: BaseStore, user_id: str):
     print("\n===== DEBUG: FETCH FRIEND POSTS =====")
 
-    mapping = store.get(("user_mapping", user_id), "fb_id")
+    mapping = store.aget(("user_mapping", user_id), "fb_id")
     print("User mapping:", mapping.value if mapping else None)
 
     if not mapping:
@@ -13,7 +13,7 @@ def get_friends_posts(store: BaseStore, user_id: str):
 
     fb_user_id = mapping.value
 
-    friends_obj = store.get(("fb_friends", fb_user_id), "list")
+    friends_obj = store.aget(("fb_friends", fb_user_id), "list")
     print("Friends list:", friends_obj.value if friends_obj else None)
 
     if not friends_obj:
@@ -24,7 +24,7 @@ def get_friends_posts(store: BaseStore, user_id: str):
     all_posts = []
 
     for fid in friend_ids:
-        posts_obj = store.get(("fb_posts", fid), "posts")
+        posts_obj = store.aget(("fb_posts", fid), "posts")
         print(f"Posts for {fid}:", posts_obj.value if posts_obj else None)
 
         if not posts_obj:
