@@ -2569,7 +2569,7 @@ async def run_travel_assistant(
     }
     final_ai_message = None
     final_handler = None
-    for chunk in graph.stream(
+    async for chunk in graph.astream(
         {"messages": [HumanMessage(content=text)]},
         config,
         stream_mode="values",
