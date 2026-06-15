@@ -2341,7 +2341,7 @@ async def write_memory(state: GraphState, config: RunnableConfig, *, store: Base
     
     # Retrieve existing profile
     namespace = ("user_profile", user_id)
-    existing_memory = store.aget(namespace, "profile")
+    existing_memory = await store.aget(namespace, "profile")
     #existing profile wrapped because trustcall_extractor expects {"UserProfile": {...}}
     existing_profile = {"UserProfile": existing_memory.value} if existing_memory and existing_memory.value else None #added the and part
     
