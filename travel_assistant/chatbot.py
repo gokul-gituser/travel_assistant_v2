@@ -1610,6 +1610,8 @@ async def handle_nearby_generic(state: GraphState, config: RunnableConfig, *, st
             )
             print(f"🔍 [{Intent.INTENT_A_NEARBY_GENERIC.value}] {tag_key}={tag_value} → {len(raw_places)} places")
         if raw_places:
+            print(f"Found {len(raw_places)} places")
+            print(raw_places)
             llm_context, _ = build_context_and_display(raw_places)
             
     system_prompt = SYSTEM_PROMPT_NEARBY_GENERIC.format(user_profile=user_profile_text,
